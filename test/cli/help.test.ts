@@ -19,6 +19,8 @@ describe("CLI help", () => {
     expect(generateHelp).toContain("--model <provider/model>");
     expect(generateHelp).toContain("--size <preset|WIDTHxHEIGHT>");
     expect(generateHelp).toContain("--extra <json>");
+    expect(generateHelp).not.toContain("--negative-prompt");
+    expect(generateHelp).toContain("Usage: image generate <prompt>");
   });
 
   test("documents config subcommands", () => {
