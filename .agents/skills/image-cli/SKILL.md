@@ -17,6 +17,8 @@ image config init
 
 Then fill in `~/.image/config.json`.
 
+`api_key` can be either a single string or an array of strings for ordered failover.
+
 Useful checks:
 
 ```bash

@@ -35,7 +35,7 @@ describe("config loading", () => {
             retryPolicy: {
               maxAttempts: 2
             },
-            api_key: "direct-openai-key"
+            api_key: ["direct-openai-key"]
           }
         }
       })
@@ -48,6 +48,43 @@ describe("config loading", () => {
       {
         envName: "API_KEY",
         value: "direct-openai-key"
+      }
+    ]);
+  });
+
+  test("accepts api_key arrays and preserves ordering for failover", async () => {
+    const homeDir = await makeTempHome("image-cli-config-array");
+    const paths = getImageConfigPaths(homeDir);
+    await mkdir(paths.configDir, { recursive: true });
+    await writeFile(
+      paths.configFile,
+      JSON.stringify({
+        version: 1,
+        defaultProvider: "openai",
+        providers: {
+          openai: {
+            enabled: true,
+            apiBaseUrl: "https://api.openai.com/v1",
+            defaultModel: "gpt-image-1.5",
+            timeoutMs: 120000,
+            retryPolicy: {
+              maxAttempts: 2
+            },
+            api_key: ["first-key", "second-key"]
+          }
+        }
+      })
+    );
+
+    const config = await loadResolvedConfig({ homeDir, env: {} });
+    expect(config.providers.openai.credentials).toEqual([
+      {
+        envName: "API_KEY_1",
+        value: "first-key"
+      },
+      {
+        envName: "API_KEY_2",
+        value: "second-key"
       }
     ]);
   });

@@ -18,7 +18,7 @@ export function buildConfigTemplates(): ConfigTemplates {
       "retryPolicy": {
         "maxAttempts": 2
       },
-      "api_key": "YOUR_OPENAI_API_KEY"
+      "api_key": ["YOUR_OPENAI_API_KEY"]
     },
     "openrouter": {
       "enabled": true,
@@ -28,7 +28,7 @@ export function buildConfigTemplates(): ConfigTemplates {
       "retryPolicy": {
         "maxAttempts": 2
       },
-      "api_key": "YOUR_OPENROUTER_API_KEY"
+      "api_key": ["YOUR_OPENROUTER_API_KEY"]
     },
     "gemini": {
       "enabled": true,
@@ -38,7 +38,7 @@ export function buildConfigTemplates(): ConfigTemplates {
       "retryPolicy": {
         "maxAttempts": 2
       },
-      "api_key": "YOUR_GEMINI_API_KEY"
+      "api_key": ["YOUR_GEMINI_API_KEY"]
     },
     "seedream": {
       "enabled": true,
@@ -48,7 +48,7 @@ export function buildConfigTemplates(): ConfigTemplates {
       "retryPolicy": {
         "maxAttempts": 2
       },
-      "api_key": "YOUR_SEEDREAM_API_KEY"
+      "api_key": ["YOUR_SEEDREAM_API_KEY"]
     },
     "qwen": {
       "enabled": true,
@@ -58,7 +58,7 @@ export function buildConfigTemplates(): ConfigTemplates {
       "retryPolicy": {
         "maxAttempts": 2
       },
-      "api_key": "YOUR_QWEN_API_KEY"
+      "api_key": ["YOUR_QWEN_API_KEY"]
     },
     "minimax": {
       "enabled": true,
@@ -68,7 +68,7 @@ export function buildConfigTemplates(): ConfigTemplates {
       "retryPolicy": {
         "maxAttempts": 2
       },
-      "api_key": "YOUR_MINIMAX_API_KEY"
+      "api_key": ["YOUR_MINIMAX_API_KEY"]
     }
   }
 }
@@ -83,7 +83,7 @@ This directory stores local configuration for the \`image\` CLI.
 Quick start:
 
 1. Copy the structure from \`config.example.jsonc\` into \`config.json\` if needed.
-2. Fill each provider's \`api_key\` directly in \`config.json\`.
+2. Fill each provider's \`api_key\` directly in \`config.json\`. It can be a string or an array of strings.
 3. Run \`image config doctor\` to verify the setup.
 
 Notes:

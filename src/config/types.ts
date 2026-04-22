@@ -10,8 +10,8 @@ export type ProviderConfig = {
   defaultModel: string;
   timeoutMs: number;
   retryPolicy: RetryPolicy;
-  apiKey?: string;
-  api_key?: string;
+  apiKey?: string | string[];
+  api_key?: string | string[];
 };
 
 export type RuntimeConfigFile = {

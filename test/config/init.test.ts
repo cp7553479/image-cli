@@ -23,6 +23,7 @@ describe("config init", () => {
     );
     await expect(access(paths.configFile, constants.F_OK)).resolves.toBeUndefined();
     await expect(access(paths.readmeFile, constants.F_OK)).resolves.toBeUndefined();
+    expect(await readFile(paths.configFile, "utf8")).toContain('"api_key": ["YOUR_OPENAI_API_KEY"]');
     expect(await readFile(paths.readmeFile, "utf8")).toContain("config.json");
   });
 

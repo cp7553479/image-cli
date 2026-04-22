@@ -62,20 +62,32 @@ export async function loadResolvedConfig(
 function resolveProviderConfig(
   providerConfig: ProviderConfig
 ): ResolvedProviderConfig {
-  const apiKey = providerConfig.api_key ?? providerConfig.apiKey;
-  const credentials = typeof apiKey === "string" && apiKey.trim()
-    ? [
-        {
-          envName: "API_KEY",
-          value: apiKey.trim()
-        }
-      ]
-    : [];
+  const apiKeys = normalizeApiKeys(providerConfig.api_key ?? providerConfig.apiKey);
+  const credentials = apiKeys.map((value, index) => ({
+    envName: apiKeys.length === 1 ? "API_KEY" : `API_KEY_${index + 1}`,
+    value
+  }));
 
   return {
     ...providerConfig,
     credentials
   };
+}
+
+function normalizeApiKeys(value: string | string[] | undefined): string[] {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed ? [trimmed] : [];
+  }
+
+  if (Array.isArray(value)) {
+    return value
+      .filter((entry): entry is string => typeof entry === "string")
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+  }
+
+  return [];
 }
 
 function toErrorMessage(error: unknown): string {

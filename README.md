@@ -114,6 +114,20 @@ This file stores provider config directly, including `api_key`.
 - `retryPolicy.maxAttempts`
 - `api_key`
 
+`api_key` supports either:
+
+```json
+"api_key": "your-api-key"
+```
+
+or:
+
+```json
+"api_key": ["your-api-key-1", "your-api-key-2"]
+```
+
+When an array is provided, the CLI tries the keys in order for same-provider failover.
+
 Current template defaults:
 
 - `openai`: `gpt-image-1.5`

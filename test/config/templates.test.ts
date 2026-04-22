@@ -8,7 +8,7 @@ describe("config templates", () => {
 
     expect(templates.configExample).toContain('"defaultProvider": "openai"');
     expect(templates.configExample).toContain("// Copy this file to config.json");
-    expect(templates.configExample).toContain('"api_key": "YOUR_OPENAI_API_KEY"');
+    expect(templates.configExample).toContain('"api_key": ["YOUR_OPENAI_API_KEY"]');
     expect(templates.readme).toContain("image config init");
     expect(templates.configExample).not.toContain("retryableHttpStatus");
   });
