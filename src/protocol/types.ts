@@ -14,6 +14,7 @@ export type AspectRatio = SupportedAspectRatio | `${number}:${number}`;
 
 export type CanonicalProviderId =
   | "openai"
+  | "openrouter"
   | "gemini"
   | "seedream"
   | "qwen"

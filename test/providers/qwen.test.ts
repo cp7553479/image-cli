@@ -35,10 +35,9 @@ describe("qwen provider", () => {
         defaultModel: "qwen-image-plus",
         timeoutMs: 30_000,
         retryPolicy: {
-          maxAttempts: 3,
-          retryableHttpStatus: [401, 403, 429, 500, 502, 503, 504]
+          maxAttempts: 3
         },
-        apiKeyEnvNames: [],
+        apiKey: "secret-key",
         credentials: []
       },
       credential: {
@@ -114,10 +113,9 @@ describe("qwen provider", () => {
         defaultModel: "qwen-image",
         timeoutMs: 30_000,
         retryPolicy: {
-          maxAttempts: 3,
-          retryableHttpStatus: [401, 403, 429, 500, 502, 503, 504]
+          maxAttempts: 3
         },
-        apiKeyEnvNames: [],
+        apiKey: "secret-key",
         credentials: []
       },
       credential: {
@@ -190,10 +188,9 @@ describe("qwen provider", () => {
           defaultModel: "qwen-image",
           timeoutMs: 30_000,
           retryPolicy: {
-            maxAttempts: 3,
-            retryableHttpStatus: [401, 403, 429, 500, 502, 503, 504]
+            maxAttempts: 3
           },
-          apiKeyEnvNames: [],
+          apiKey: "secret-key",
           credentials: []
         },
         credential: {
@@ -229,10 +226,9 @@ describe("qwen provider", () => {
         defaultModel: "qwen-image",
         timeoutMs: 30_000,
         retryPolicy: {
-          maxAttempts: 3,
-          retryableHttpStatus: [401, 403, 429, 500, 502, 503, 504]
+          maxAttempts: 3
         },
-        apiKeyEnvNames: [],
+        apiKey: "secret-key",
         credentials: []
       },
       credential: {

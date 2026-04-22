@@ -29,38 +29,18 @@ export async function initImageConfigDirectory(
   await writeIfMissing(
     paths.configFile,
     stripCommentLines(templates.configExample),
-    options.force ?? false,
-    created,
-    skipped
-  );
-  await writeIfMissing(
-    paths.envFile,
-    stripCommentLines(templates.envExample),
-    options.force ?? false,
+    false,
     created,
     skipped
   );
   await writeIfMissing(
     paths.configExampleFile,
     templates.configExample,
-    options.force ?? false,
+    false,
     created,
     skipped
   );
-  await writeIfMissing(
-    paths.envExampleFile,
-    templates.envExample,
-    options.force ?? false,
-    created,
-    skipped
-  );
-  await writeIfMissing(
-    paths.gitignoreFile,
-    templates.gitignore,
-    options.force ?? false,
-    created,
-    skipped
-  );
+  await writeAlways(paths.readmeFile, templates.readme, created);
 
   return {
     created,
@@ -88,6 +68,17 @@ async function writeIfMissing(
     }
     throw error;
   }
+}
+
+async function writeAlways(
+  filePath: string,
+  contents: string,
+  created: string[]
+): Promise<void> {
+  await writeFile(filePath, contents, {
+    flag: "w"
+  });
+  created.push(filePath);
 }
 
 function stripCommentLines(contents: string): string {

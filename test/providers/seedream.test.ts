@@ -171,19 +171,18 @@ function makeContext(overrides: ContextOverrides = {}): ProviderGenerateContext 
       defaultModel: "doubao-seedream-4.5",
       timeoutMs: 120000,
       retryPolicy: {
-        maxAttempts: 3,
-        retryableHttpStatus: [401, 403, 429, 500, 502, 503, 504]
+        maxAttempts: 3
       },
-      apiKeyEnvNames: ["IMAGE_SEEDREAM_API_KEY_1"],
+      apiKey: "test-key",
       credentials: [
         {
-          envName: "IMAGE_SEEDREAM_API_KEY_1",
+          envName: "API_KEY",
           value: "test-key"
         }
       ]
     },
     credential: {
-      envName: "IMAGE_SEEDREAM_API_KEY_1",
+      envName: "API_KEY",
       value: "test-key"
     },
     preparedImages: overrides.preparedImages ?? [],

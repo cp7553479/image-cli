@@ -15,6 +15,12 @@ export const PROVIDER_CATALOG: ProviderCatalogEntry[] = [
     description: "OpenAI Images API"
   },
   {
+    providerId: "openrouter",
+    aliases: ["openrouter-image"],
+    defaultBaseUrl: "https://openrouter.ai/api/v1",
+    description: "OpenRouter image generation via unified chat completions"
+  },
+  {
     providerId: "gemini",
     aliases: ["nano-banana"],
     defaultBaseUrl: "https://generativelanguage.googleapis.com/v1beta",

@@ -31,19 +31,18 @@ function makeContext(overrides: Partial<ProviderGenerateContext> = {}): Provider
       defaultModel: "image-01",
       timeoutMs: 120_000,
       retryPolicy: {
-        maxAttempts: 3,
-        retryableHttpStatus: [401, 403, 429, 500]
+        maxAttempts: 3
       },
-      apiKeyEnvNames: ["MINIMAX_API_KEY"],
+      apiKey: "secret-key",
       credentials: [
         {
-          envName: "MINIMAX_API_KEY",
+          envName: "API_KEY",
           value: "secret-key"
         }
       ]
     },
     credential: {
-      envName: "MINIMAX_API_KEY",
+      envName: "API_KEY",
       value: "secret-key"
     },
     preparedImages: [

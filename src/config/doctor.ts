@@ -15,9 +15,9 @@ export async function runConfigDoctor(
 ): Promise<Record<string, unknown>> {
   const homeDir = options.homeDir ?? os.homedir();
   const paths = getImageConfigPaths(homeDir);
-  const [configExists, envExists, curlAvailable] = await Promise.all([
+  const [configExists, readmeExists, curlAvailable] = await Promise.all([
     fileExists(paths.configFile),
-    fileExists(paths.envFile),
+    fileExists(paths.readmeFile),
     hasCurl()
   ]);
 
@@ -48,7 +48,7 @@ export async function runConfigDoctor(
     paths,
     curlAvailable,
     configExists,
-    envExists,
+    readmeExists,
     resolvedConfig,
     configError
   };

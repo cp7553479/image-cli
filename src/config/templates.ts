@@ -1,7 +1,6 @@
 export type ConfigTemplates = {
   configExample: string;
-  envExample: string;
-  gitignore: string;
+  readme: string;
 };
 
 export function buildConfigTemplates(): ConfigTemplates {
@@ -14,24 +13,32 @@ export function buildConfigTemplates(): ConfigTemplates {
     "openai": {
       "enabled": true,
       "apiBaseUrl": "https://api.openai.com/v1",
-      "defaultModel": "chatgpt-image-latest",
+      "defaultModel": "gpt-image-1.5",
       "timeoutMs": 120000,
       "retryPolicy": {
-        "maxAttempts": 2,
-        "retryableHttpStatus": [401, 408, 409, 429, 500, 502, 503, 504]
+        "maxAttempts": 2
       },
-      "apiKeyEnvNames": ["IMAGE_OPENAI_API_KEY_1"]
+      "api_key": "YOUR_OPENAI_API_KEY"
+    },
+    "openrouter": {
+      "enabled": true,
+      "apiBaseUrl": "https://openrouter.ai/api/v1",
+      "defaultModel": "google/gemini-3.1-flash-image-preview",
+      "timeoutMs": 120000,
+      "retryPolicy": {
+        "maxAttempts": 2
+      },
+      "api_key": "YOUR_OPENROUTER_API_KEY"
     },
     "gemini": {
       "enabled": true,
       "apiBaseUrl": "https://generativelanguage.googleapis.com/v1beta",
-      "defaultModel": "gemini-2.5-flash-image",
+      "defaultModel": "gemini-3.1-flash-image-preview",
       "timeoutMs": 120000,
       "retryPolicy": {
-        "maxAttempts": 2,
-        "retryableHttpStatus": [401, 408, 409, 429, 500, 502, 503, 504]
+        "maxAttempts": 2
       },
-      "apiKeyEnvNames": ["IMAGE_GEMINI_API_KEY_1"]
+      "api_key": "YOUR_GEMINI_API_KEY"
     },
     "seedream": {
       "enabled": true,
@@ -39,10 +46,9 @@ export function buildConfigTemplates(): ConfigTemplates {
       "defaultModel": "doubao-seedream-4.5",
       "timeoutMs": 120000,
       "retryPolicy": {
-        "maxAttempts": 2,
-        "retryableHttpStatus": [401, 408, 409, 429, 500, 502, 503, 504]
+        "maxAttempts": 2
       },
-      "apiKeyEnvNames": ["IMAGE_SEEDREAM_API_KEY_1"]
+      "api_key": "YOUR_SEEDREAM_API_KEY"
     },
     "qwen": {
       "enabled": true,
@@ -50,10 +56,9 @@ export function buildConfigTemplates(): ConfigTemplates {
       "defaultModel": "qwen-image-2.0-pro",
       "timeoutMs": 120000,
       "retryPolicy": {
-        "maxAttempts": 2,
-        "retryableHttpStatus": [401, 408, 409, 429, 500, 502, 503, 504]
+        "maxAttempts": 2
       },
-      "apiKeyEnvNames": ["IMAGE_QWEN_API_KEY_1"]
+      "api_key": "YOUR_QWEN_API_KEY"
     },
     "minimax": {
       "enabled": true,
@@ -61,23 +66,30 @@ export function buildConfigTemplates(): ConfigTemplates {
       "defaultModel": "image-01",
       "timeoutMs": 120000,
       "retryPolicy": {
-        "maxAttempts": 2,
-        "retryableHttpStatus": [401, 408, 409, 429, 500, 502, 503, 504]
+        "maxAttempts": 2
       },
-      "apiKeyEnvNames": ["IMAGE_MINIMAX_API_KEY_1"]
+      "api_key": "YOUR_MINIMAX_API_KEY"
     }
   }
 }
 `,
-    envExample: `# Copy this file to .env and fill in your keys.
-IMAGE_OPENAI_API_KEY_1=
-IMAGE_OPENAI_API_KEY_2=
-IMAGE_GEMINI_API_KEY_1=
-IMAGE_SEEDREAM_API_KEY_1=
-IMAGE_QWEN_API_KEY_1=
-IMAGE_MINIMAX_API_KEY_1=
+    readme: `# ~/.image
+
+This directory stores local configuration for the \`image\` CLI.
+
+- \`config.json\`: your active provider configuration, including \`api_key\`
+- \`config.example.jsonc\`: commented template for reference
+
+Quick start:
+
+1. Copy the structure from \`config.example.jsonc\` into \`config.json\` if needed.
+2. Fill each provider's \`api_key\` directly in \`config.json\`.
+3. Run \`image config doctor\` to verify the setup.
+
+Notes:
+
+- \`image config init\` does not overwrite an existing \`config.json\`.
+- \`image config init\` refreshes this README so the usage notes stay current.
 `,
-    gitignore: `.env
-`
   };
 }

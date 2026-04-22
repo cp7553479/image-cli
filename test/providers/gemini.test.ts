@@ -12,29 +12,28 @@ function makeContext(
       model: {
         providerId: "gemini",
         providerAlias: "nano-banana",
-        modelId: "gemini-2.5-flash-image"
+        modelId: "gemini-3.1-flash-image-preview"
       },
       aspectRatio: "16:9"
     },
     providerConfig: {
       enabled: true,
       apiBaseUrl: "https://generativelanguage.googleapis.com/v1beta",
-      defaultModel: "gemini-2.5-flash-image",
+      defaultModel: "gemini-3.1-flash-image-preview",
       timeoutMs: 30_000,
       retryPolicy: {
-        maxAttempts: 3,
-        retryableHttpStatus: [429, 500, 502, 503, 504]
+        maxAttempts: 3
       },
-      apiKeyEnvNames: ["GEMINI_API_KEY"],
+      apiKey: "test-key",
       credentials: [
         {
-          envName: "GEMINI_API_KEY",
+          envName: "API_KEY",
           value: "test-key"
         }
       ]
     },
     credential: {
-      envName: "GEMINI_API_KEY",
+      envName: "API_KEY",
       value: "test-key"
     },
     preparedImages: [
@@ -55,7 +54,7 @@ describe("gemini provider", () => {
 
     expect(operation.request.method).toBe("POST");
     expect(operation.request.url).toBe(
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent"
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent"
     );
     expect(operation.request.headers).toEqual({
       "x-goog-api-key": "test-key"

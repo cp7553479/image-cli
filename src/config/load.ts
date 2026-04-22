@@ -1,8 +1,6 @@
 import { readFile } from "node:fs/promises";
 import os from "node:os";
 
-import { parse as parseDotEnv } from "dotenv";
-
 import { CANONICAL_PROVIDER_IDS } from "../protocol/model-ref.js";
 import type { CanonicalProviderId } from "../protocol/types.js";
 import { getImageConfigPaths } from "./paths.js";
@@ -40,11 +38,6 @@ export async function loadResolvedConfig(
     throw new Error(`Failed to parse config.json: ${toErrorMessage(error)}`);
   }
 
-  const dotenvValues = await readFile(paths.envFile, "utf8")
-    .then((contents) => parseDotEnv(contents))
-    .catch(() => ({}));
-  const runtimeEnv = options.env ?? {};
-
   const providers = CANONICAL_PROVIDER_IDS.reduce<
     Record<CanonicalProviderId, ResolvedProviderConfig>
   >((accumulator, providerId) => {
@@ -54,9 +47,7 @@ export async function loadResolvedConfig(
     }
 
     accumulator[providerId] = resolveProviderConfig(
-      providerConfig,
-      runtimeEnv,
-      dotenvValues
+      providerConfig
     );
     return accumulator;
   }, {} as Record<CanonicalProviderId, ResolvedProviderConfig>);
@@ -69,23 +60,17 @@ export async function loadResolvedConfig(
 }
 
 function resolveProviderConfig(
-  providerConfig: ProviderConfig,
-  runtimeEnv: Record<string, string | undefined>,
-  dotenvValues: Record<string, string>
+  providerConfig: ProviderConfig
 ): ResolvedProviderConfig {
-  const credentials = providerConfig.apiKeyEnvNames.flatMap((envName) => {
-    const value = runtimeEnv[envName] ?? dotenvValues[envName];
-    if (!value) {
-      return [];
-    }
-
-    return [
-      {
-        envName,
-        value
-      }
-    ];
-  });
+  const apiKey = providerConfig.api_key ?? providerConfig.apiKey;
+  const credentials = typeof apiKey === "string" && apiKey.trim()
+    ? [
+        {
+          envName: "API_KEY",
+          value: apiKey.trim()
+        }
+      ]
+    : [];
 
   return {
     ...providerConfig,

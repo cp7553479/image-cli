@@ -27,7 +27,9 @@ export async function getSanitizedResolvedConfig(
           defaultModel: provider.defaultModel,
           timeoutMs: provider.timeoutMs,
           retryPolicy: provider.retryPolicy,
-          apiKeyEnvNames: provider.apiKeyEnvNames,
+          apiKey: {
+            present: Boolean(provider.api_key ?? provider.apiKey)
+          },
           credentials: provider.credentials.map((credential) => ({
             envName: credential.envName,
             present: Boolean(credential.value)

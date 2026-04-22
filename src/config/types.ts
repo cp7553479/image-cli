@@ -2,7 +2,6 @@ import type { CanonicalProviderId } from "../protocol/types.js";
 
 export type RetryPolicy = {
   maxAttempts: number;
-  retryableHttpStatus: number[];
 };
 
 export type ProviderConfig = {
@@ -11,7 +10,8 @@ export type ProviderConfig = {
   defaultModel: string;
   timeoutMs: number;
   retryPolicy: RetryPolicy;
-  apiKeyEnvNames: string[];
+  apiKey?: string;
+  api_key?: string;
 };
 
 export type RuntimeConfigFile = {
@@ -38,8 +38,6 @@ export type ResolvedConfig = {
 export type ImageConfigPaths = {
   configDir: string;
   configFile: string;
-  envFile: string;
-  envExampleFile: string;
-  gitignoreFile: string;
   configExampleFile: string;
+  readmeFile: string;
 };

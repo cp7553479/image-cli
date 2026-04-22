@@ -142,19 +142,18 @@ function makeContext(
       defaultModel: "gpt-image-1",
       timeoutMs: 120000,
       retryPolicy: {
-        maxAttempts: 2,
-        retryableHttpStatus: [401, 429, 500]
+        maxAttempts: 2
       },
-      apiKeyEnvNames: ["IMAGE_OPENAI_API_KEY_1"],
+      apiKey: "sk-test",
       credentials: [
         {
-          envName: "IMAGE_OPENAI_API_KEY_1",
+          envName: "API_KEY",
           value: "sk-test"
         }
       ]
     },
     credential: {
-      envName: "IMAGE_OPENAI_API_KEY_1",
+      envName: "API_KEY",
       value: "sk-test"
     },
     preparedImages: overrides.images ? [{ source: "test", kind: "url", url: overrides.images[0] }] : []

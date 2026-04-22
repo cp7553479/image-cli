@@ -18,25 +18,26 @@ describe("config init", () => {
       [
         paths.configFile,
         paths.configExampleFile,
-        paths.envExampleFile,
-        paths.envFile,
-        paths.gitignoreFile
+        paths.readmeFile
       ].sort()
     );
     await expect(access(paths.configFile, constants.F_OK)).resolves.toBeUndefined();
-    await expect(access(paths.envFile, constants.F_OK)).resolves.toBeUndefined();
-    expect(await readFile(paths.gitignoreFile, "utf8")).toContain(".env");
+    await expect(access(paths.readmeFile, constants.F_OK)).resolves.toBeUndefined();
+    expect(await readFile(paths.readmeFile, "utf8")).toContain("config.json");
   });
 
-  test("does not overwrite existing config without force", async () => {
+  test("does not overwrite existing config when .image already exists but refreshes README", async () => {
     const homeDir = await makeTempHome("image-cli-init-existing");
     const paths = getImageConfigPaths(homeDir);
     await mkdir(paths.configDir, { recursive: true });
     await writeFile(paths.configFile, '{"version":1,"defaultProvider":"openai","providers":{}}');
+    await writeFile(paths.readmeFile, "old readme");
 
     const result = await initImageConfigDirectory({ homeDir });
 
     expect(result.skipped).toContain(paths.configFile);
+    expect(result.created).toContain(paths.readmeFile);
+    expect(await readFile(paths.readmeFile, "utf8")).toContain("config.json");
   });
 });
 

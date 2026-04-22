@@ -150,10 +150,9 @@ function makeProviderConfig(
     defaultModel: "chatgpt-image-latest",
     timeoutMs: 30_000,
     retryPolicy: {
-      maxAttempts: 2,
-      retryableHttpStatus: [401, 429, 500]
+      maxAttempts: 2
     },
-    apiKeyEnvNames: credentials.map((credential) => credential.envName),
+    api_key: credentials[0]?.value ?? "",
     credentials
   };
 }

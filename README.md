@@ -5,6 +5,7 @@ Unified image generation CLI for agents and scripts.
 It gives one command surface, `image`, across these providers:
 
 - OpenAI / ChatGPT Image
+- OpenRouter
 - Gemini / Nano Banana
 - Volcengine Seedream
 - Qwen Image
@@ -26,15 +27,13 @@ npm install -g @cp7553479/image-cli
 image config init
 ```
 
-2. Edit `~/.image/.env` and add your API keys.
+2. Edit `~/.image/config.json` and fill each provider `api_key`.
 
-3. Edit `~/.image/config.json` and set provider defaults if needed.
-
-4. Generate an image:
+3. Generate an image:
 
 ```bash
 image generate "A cinematic poster of a red fox in snowfall" \
-  --model openai/chatgpt-image-latest \
+  --model openai/gpt-image-1.5 \
   --size 2k \
   --aspect 16:9
 ```
@@ -74,16 +73,16 @@ image generate "Studio product photo of a ceramic mug" \
 
 ```bash
 image generate "Turn this into a glossy campaign visual" \
-  --model gemini/gemini-2.5-flash-image \
+  --model gemini/gemini-3.1-flash-image-preview \
   --image ./reference.png \
   --aspect 3:4
 ```
 
 ```bash
-image generate "Minimal logo on white background" \
-  --model minimax/image-01 \
-  --size 1024x1024 \
-  --json
+image generate "High-end concept visual through OpenRouter" \
+  --model openrouter/google/gemini-3.1-flash-image-preview \
+  --size 4k \
+  --aspect 16:9
 ```
 
 ### `image config`
@@ -96,57 +95,41 @@ image config doctor [--json]
 image config providers [--json]
 ```
 
-Useful commands:
-
-```bash
-image config path
-image config show --json
-image config doctor --json
-image config providers
-```
-
 ## Configuration
 
 The CLI uses `~/.image/`:
 
 - `config.json`: strict JSON runtime config
-- `.env`: secret values
 - `config.example.jsonc`: commented template
-- `.env.example`: key template
-- `.gitignore`: ignores `.env`
+- `README.md`: local setup notes
 
 ### `config.json`
 
-This file stores non-secret config only:
+This file stores provider config directly, including `api_key`.
 
 - `enabled`
 - `apiBaseUrl`
 - `defaultModel`
 - `timeoutMs`
-- `retryPolicy`
-- `apiKeyEnvNames`
+- `retryPolicy.maxAttempts`
+- `api_key`
 
-### `.env`
+Current template defaults:
 
-Secrets live here:
-
-```dotenv
-IMAGE_OPENAI_API_KEY_1=
-IMAGE_OPENAI_API_KEY_2=
-IMAGE_GEMINI_API_KEY_1=
-IMAGE_SEEDREAM_API_KEY_1=
-IMAGE_QWEN_API_KEY_1=
-IMAGE_MINIMAX_API_KEY_1=
-```
-
-When one key for the same provider fails with a retryable credential error, the CLI automatically tries the next key listed in `apiKeyEnvNames`.
+- `openai`: `gpt-image-1.5`
+- `openrouter`: `google/gemini-3.1-flash-image-preview`
+- `gemini`: `gemini-3.1-flash-image-preview`
+- `seedream`: `doubao-seedream-4.5`
+- `qwen`: `qwen-image-2.0-pro`
+- `minimax`: `image-01`
 
 ## Model Syntax
 
 Use `provider/model`:
 
-- `openai/chatgpt-image-latest`
-- `gemini/gemini-2.5-flash-image`
+- `openai/gpt-image-1.5`
+- `openrouter/google/gemini-3.1-flash-image-preview`
+- `gemini/gemini-3.1-flash-image-preview`
 - `seedream/doubao-seedream-4.5`
 - `qwen/qwen-image-2.0-pro`
 - `minimax/image-01`
@@ -154,6 +137,7 @@ Use `provider/model`:
 Friendly provider aliases also work:
 
 - `chatgpt-image/...`
+- `openrouter-image/...`
 - `nano-banana/...`
 - `qwen-image/...`
 - `minimax-image/...`

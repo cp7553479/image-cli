@@ -26,6 +26,7 @@ describe("model ref parsing", () => {
   test("exposes the canonical provider list", () => {
     expect(CANONICAL_PROVIDER_IDS).toEqual([
       "openai",
+      "openrouter",
       "gemini",
       "seedream",
       "qwen",
@@ -43,6 +44,7 @@ describe("model ref parsing", () => {
 
   test("resolves aliases without parsing a full ref", () => {
     expect(resolveProviderAlias("chatgpt-image")).toBe("openai");
+    expect(resolveProviderAlias("openrouter-image")).toBe("openrouter");
     expect(resolveProviderAlias("minimax-image")).toBe("minimax");
   });
 });

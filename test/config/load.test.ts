@@ -12,14 +12,12 @@ describe("config loading", () => {
     expect(getImageConfigPaths("/tmp/fake-home")).toEqual({
       configDir: "/tmp/fake-home/.image",
       configFile: "/tmp/fake-home/.image/config.json",
-      envFile: "/tmp/fake-home/.image/.env",
-      envExampleFile: "/tmp/fake-home/.image/.env.example",
-      gitignoreFile: "/tmp/fake-home/.image/.gitignore",
+      readmeFile: "/tmp/fake-home/.image/README.md",
       configExampleFile: "/tmp/fake-home/.image/config.example.jsonc"
     });
   });
 
-  test("loads config json and resolves api keys with process env precedence", async () => {
+  test("loads config json and resolves direct api keys", async () => {
     const homeDir = await makeTempHome("image-cli-config");
     const paths = getImageConfigPaths(homeDir);
     await mkdir(paths.configDir, { recursive: true });
@@ -32,43 +30,57 @@ describe("config loading", () => {
           openai: {
             enabled: true,
             apiBaseUrl: "https://api.openai.com/v1",
-            defaultModel: "chatgpt-image-latest",
+            defaultModel: "gpt-image-1.5",
             timeoutMs: 120000,
             retryPolicy: {
-              maxAttempts: 2,
-              retryableHttpStatus: [401, 429, 500]
+              maxAttempts: 2
             },
-            apiKeyEnvNames: [
-              "IMAGE_OPENAI_API_KEY_1",
-              "IMAGE_OPENAI_API_KEY_2"
-            ]
+            api_key: "direct-openai-key"
           }
         }
       })
     );
-    await writeFile(
-      paths.envFile,
-      ["IMAGE_OPENAI_API_KEY_1=from-dotenv", "IMAGE_OPENAI_API_KEY_2=second-dotenv"].join(
-        "\n"
-      )
-    );
 
-    const config = await loadResolvedConfig({
-      homeDir,
-      env: {
-        IMAGE_OPENAI_API_KEY_1: "from-process-env"
-      }
-    });
+    const config = await loadResolvedConfig({ homeDir, env: {} });
 
     expect(config.defaultProvider).toBe("openai");
     expect(config.providers.openai.credentials).toEqual([
       {
-        envName: "IMAGE_OPENAI_API_KEY_1",
-        value: "from-process-env"
-      },
+        envName: "API_KEY",
+        value: "direct-openai-key"
+      }
+    ]);
+  });
+
+  test("accepts camelCase apiKey too", async () => {
+    const homeDir = await makeTempHome("image-cli-config-camel");
+    const paths = getImageConfigPaths(homeDir);
+    await mkdir(paths.configDir, { recursive: true });
+    await writeFile(
+      paths.configFile,
+      JSON.stringify({
+        version: 1,
+        defaultProvider: "gemini",
+        providers: {
+          gemini: {
+            enabled: true,
+            apiBaseUrl: "https://generativelanguage.googleapis.com/v1beta",
+            defaultModel: "gemini-3.1-flash-image-preview",
+            timeoutMs: 120000,
+            retryPolicy: {
+              maxAttempts: 2
+            },
+            apiKey: "gemini-direct-key"
+          }
+        }
+      })
+    );
+
+    const config = await loadResolvedConfig({ homeDir, env: {} });
+    expect(config.providers.gemini.credentials).toEqual([
       {
-        envName: "IMAGE_OPENAI_API_KEY_2",
-        value: "second-dotenv"
+        envName: "API_KEY",
+        value: "gemini-direct-key"
       }
     ]);
   });

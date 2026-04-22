@@ -15,7 +15,7 @@ Run this first on a new machine or repo:
 image config init
 ```
 
-Then fill in `~/.image/.env` and review `~/.image/config.json`.
+Then fill in `~/.image/config.json`.
 
 Useful checks:
 
@@ -54,27 +54,28 @@ Examples:
 
 ```bash
 image generate "Editorial portrait with dramatic rim light" \
-  --model openai/chatgpt-image-latest \
+  --model openai/gpt-image-1.5 \
   --size 2k \
   --aspect 3:4
 ```
 
 ```bash
 image generate "Turn this product reference into a clean launch visual" \
-  --model gemini/gemini-2.5-flash-image \
+  --model gemini/gemini-3.1-flash-image-preview \
   --image ./reference.png \
   --extra '{"thinkingConfig":{"thinkingLevel":"low"}}'
 ```
 
 ```bash
-image generate "Studio ecommerce render" \
-  --model seedream/doubao-seedream-4.5 \
-  --extra '{"watermark":false}'
+image generate "Fast routed image generation through OpenRouter" \
+  --model openrouter/google/gemini-3.1-flash-image-preview \
+  --size 4k
 ```
 
 ## Provider Aliases
 
 - `chatgpt-image` -> `openai`
+- `openrouter-image` -> `openrouter`
 - `nano-banana` -> `gemini`
 - `qwen-image` -> `qwen`
 - `minimax-image` -> `minimax`

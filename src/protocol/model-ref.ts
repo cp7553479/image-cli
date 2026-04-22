@@ -2,6 +2,7 @@ import type { CanonicalProviderId, ModelRef } from "./types.js";
 
 export const CANONICAL_PROVIDER_IDS: CanonicalProviderId[] = [
   "openai",
+  "openrouter",
   "gemini",
   "seedream",
   "qwen",
@@ -11,6 +12,8 @@ export const CANONICAL_PROVIDER_IDS: CanonicalProviderId[] = [
 const PROVIDER_ALIAS_MAP: Record<string, CanonicalProviderId> = {
   openai: "openai",
   "chatgpt-image": "openai",
+  openrouter: "openrouter",
+  "openrouter-image": "openrouter",
   gemini: "gemini",
   "nano-banana": "gemini",
   seedream: "seedream",

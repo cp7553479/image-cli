@@ -269,10 +269,8 @@ Root config directory:
 Files:
 
 - `~/.image/config.json`
-- `~/.image/.env`
 - `~/.image/config.example.jsonc`
-- `~/.image/.env.example`
-- `~/.image/.gitignore`
+- `~/.image/README.md`
 
 ### `config.json`
 
@@ -286,44 +284,25 @@ Strict JSON only.
     "openai": {
       "enabled": true,
       "apiBaseUrl": "https://api.openai.com/v1",
-      "defaultModel": "chatgpt-image-latest",
+      "defaultModel": "gpt-image-1.5",
       "timeoutMs": 120000,
       "retryPolicy": {
-        "maxAttempts": 2,
-        "retryableHttpStatus": [401, 408, 409, 429, 500, 502, 503, 504]
+        "maxAttempts": 2
       },
-      "apiKeyEnvNames": ["IMAGE_OPENAI_API_KEY_1"]
+      "api_key": "YOUR_OPENAI_API_KEY"
     }
   }
 }
 ```
 
-### `.env`
-
-Contains only secrets and secret-like runtime overrides.
-
-Example:
-
-```dotenv
-IMAGE_OPENAI_API_KEY_1=
-IMAGE_OPENAI_API_KEY_2=
-IMAGE_GEMINI_API_KEY_1=
-```
-
-Precedence:
-
-1. current process environment
-2. `~/.image/.env`
-3. no secret -> configuration error
-
 ## Credential Rotation
 
 Per provider:
 
-- load `apiKeyEnvNames[]`
-- resolve each env var into a credential candidate
-- attempt in listed order
-- rotate to next key only on classified retryable credential failures
+- load the configured `api_key`
+- build one credential candidate for the provider
+- attempt it once
+- retry behavior is provider-classified, but no multi-key rotation exists in the direct-`api_key` configuration model
 
 Retryable credential failures:
 
@@ -358,30 +337,43 @@ Shared transport requirements:
 ### OpenAI
 
 - endpoint: `POST /images/generations`
+- default model: `gpt-image-1.5`
 - optional future edit endpoint: `POST /images/edits`
 - auth header: `Authorization: Bearer`
+
+### OpenRouter
+
+- endpoint: `POST /chat/completions`
+- default model: `google/gemini-3.1-flash-image-preview`
+- auth header: `Authorization: Bearer`
+- use `modalities: ["image", "text"]`
+- use `image_config.aspect_ratio` and `image_config.image_size` when available
 
 ### Gemini
 
 - native endpoint: `POST /models/{model}:generateContent`
+- default model: `gemini-3.1-flash-image-preview`
 - auth header: `x-goog-api-key`
 - treat Nano Banana aliases as Gemini models
 
 ### Seedream
 
 - endpoint: `POST /images/generations`
+- default model: `doubao-seedream-4.5`
 - auth header: `Authorization: Bearer`
 - support provider extra for sequential generation controls
 
 ### Qwen
 
 - sync generate/edit endpoint: `POST /services/aigc/multimodal-generation/generation`
+- default model: `qwen-image-2.0-pro`
 - async generate endpoint: `POST /services/aigc/text2image/image-synthesis`
 - poll endpoint: `GET /tasks/{task_id}`
 
 ### MiniMax
 
 - endpoint: `POST /image_generation`
+- default model: `image-01`
 - auth header: `Authorization: Bearer`
 - support reference-image flow through provider-native fields
 
@@ -439,4 +431,3 @@ Skill requirements:
 - explain `image config` subcommands
 - explain `--extra`
 - keep wording concise and usage-focused
-

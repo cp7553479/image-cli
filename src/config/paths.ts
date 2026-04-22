@@ -7,9 +7,7 @@ export function getImageConfigPaths(homeDir: string): ImageConfigPaths {
   return {
     configDir,
     configFile: path.join(configDir, "config.json"),
-    envFile: path.join(configDir, ".env"),
-    envExampleFile: path.join(configDir, ".env.example"),
-    gitignoreFile: path.join(configDir, ".gitignore"),
-    configExampleFile: path.join(configDir, "config.example.jsonc")
+    configExampleFile: path.join(configDir, "config.example.jsonc"),
+    readmeFile: path.join(configDir, "README.md")
   };
 }
