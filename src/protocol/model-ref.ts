@@ -23,15 +23,22 @@ const PROVIDER_ALIAS_MAP: Record<string, CanonicalProviderId> = {
   "minimax-image": "minimax"
 };
 
-export function resolveProviderAlias(value: string): CanonicalProviderId {
+const CUSTOM_PROVIDER_PATTERN = /^[a-z0-9][a-z0-9_-]*$/i;
+
+export function resolveProviderAlias(value: string): string {
   const normalized = value.trim().toLowerCase();
   const providerId = PROVIDER_ALIAS_MAP[normalized];
-  if (!providerId) {
-    throw new Error(
-      `Unknown provider "${value}". Expected one of: ${Object.keys(PROVIDER_ALIAS_MAP).join(", ")}`
-    );
+  if (providerId) {
+    return providerId;
   }
-  return providerId;
+
+  if (CUSTOM_PROVIDER_PATTERN.test(normalized)) {
+    return normalized;
+  }
+
+  throw new Error(
+    `Unknown provider "${value}". Expected one of: ${Object.keys(PROVIDER_ALIAS_MAP).join(", ")} or a custom provider id.`
+  );
 }
 
 export function parseModelRef(value: string): ModelRef {

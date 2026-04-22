@@ -1,6 +1,5 @@
 import type { CredentialEntry, ResolvedProviderConfig } from "../config/types.js";
 import type { GenerateRequest, ProviderCapabilities } from "../protocol/request.js";
-import type { CanonicalProviderId } from "../protocol/types.js";
 import type { CurlExecutionResult, CurlRequest } from "../transport/curl.js";
 
 export type PreparedImageInput =
@@ -34,7 +33,7 @@ export type ProviderImageResult = {
 };
 
 export type GenerateResult = {
-  providerId: CanonicalProviderId;
+  providerId: string;
   modelId: string;
   images: ProviderImageResult[];
   warnings: string[];
@@ -78,7 +77,7 @@ export type ProviderErrorContext = {
 };
 
 export type ProviderPlugin = {
-  providerId: CanonicalProviderId;
+  providerId: string;
   aliases: string[];
   capabilities: ProviderCapabilities;
   buildGenerateOperation(input: ProviderGenerateContext): Promise<ProviderOperation>;

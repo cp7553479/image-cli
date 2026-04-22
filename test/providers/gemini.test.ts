@@ -19,7 +19,6 @@ function makeContext(
     providerConfig: {
       enabled: true,
       apiBaseUrl: "https://generativelanguage.googleapis.com/v1beta",
-      defaultModel: "gemini-3.1-flash-image-preview",
       timeoutMs: 30_000,
       retryPolicy: {
         maxAttempts: 3

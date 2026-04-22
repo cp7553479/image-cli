@@ -25,12 +25,11 @@ describe("config loading", () => {
       paths.configFile,
       JSON.stringify({
         version: 1,
-        defaultProvider: "openai",
+        defaultModel: "openai/gpt-image-1.5",
         providers: {
           openai: {
             enabled: true,
             apiBaseUrl: "https://api.openai.com/v1",
-            defaultModel: "gpt-image-1.5",
             timeoutMs: 120000,
             retryPolicy: {
               maxAttempts: 2
@@ -43,7 +42,7 @@ describe("config loading", () => {
 
     const config = await loadResolvedConfig({ homeDir, env: {} });
 
-    expect(config.defaultProvider).toBe("openai");
+    expect(config.defaultModel).toBe("openai/gpt-image-1.5");
     expect(config.providers.openai.credentials).toEqual([
       {
         envName: "API_KEY",
@@ -60,12 +59,11 @@ describe("config loading", () => {
       paths.configFile,
       JSON.stringify({
         version: 1,
-        defaultProvider: "openai",
+        defaultModel: "openai/gpt-image-1.5",
         providers: {
           openai: {
             enabled: true,
             apiBaseUrl: "https://api.openai.com/v1",
-            defaultModel: "gpt-image-1.5",
             timeoutMs: 120000,
             retryPolicy: {
               maxAttempts: 2
@@ -97,12 +95,11 @@ describe("config loading", () => {
       paths.configFile,
       JSON.stringify({
         version: 1,
-        defaultProvider: "gemini",
+        defaultModel: "gemini/gemini-3.1-flash-image-preview",
         providers: {
           gemini: {
             enabled: true,
             apiBaseUrl: "https://generativelanguage.googleapis.com/v1beta",
-            defaultModel: "gemini-3.1-flash-image-preview",
             timeoutMs: 120000,
             retryPolicy: {
               maxAttempts: 2

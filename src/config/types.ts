@@ -1,5 +1,3 @@
-import type { CanonicalProviderId } from "../protocol/types.js";
-
 export type RetryPolicy = {
   maxAttempts: number;
 };
@@ -7,7 +5,6 @@ export type RetryPolicy = {
 export type ProviderConfig = {
   enabled: boolean;
   apiBaseUrl: string;
-  defaultModel: string;
   timeoutMs: number;
   retryPolicy: RetryPolicy;
   apiKey?: string | string[];
@@ -16,8 +13,8 @@ export type ProviderConfig = {
 
 export type RuntimeConfigFile = {
   version: number;
-  defaultProvider: CanonicalProviderId;
-  providers: Partial<Record<CanonicalProviderId, ProviderConfig>>;
+  defaultModel: string;
+  providers: Record<string, ProviderConfig>;
 };
 
 export type CredentialEntry = {
@@ -31,8 +28,8 @@ export type ResolvedProviderConfig = ProviderConfig & {
 
 export type ResolvedConfig = {
   version: number;
-  defaultProvider: CanonicalProviderId;
-  providers: Record<CanonicalProviderId, ResolvedProviderConfig>;
+  defaultModel: string;
+  providers: Record<string, ResolvedProviderConfig>;
 };
 
 export type ImageConfigPaths = {

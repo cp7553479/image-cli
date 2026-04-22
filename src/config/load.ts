@@ -1,8 +1,6 @@
 import { readFile } from "node:fs/promises";
 import os from "node:os";
 
-import { CANONICAL_PROVIDER_IDS } from "../protocol/model-ref.js";
-import type { CanonicalProviderId } from "../protocol/types.js";
 import { getImageConfigPaths } from "./paths.js";
 import type {
   ProviderConfig,
@@ -38,23 +36,16 @@ export async function loadResolvedConfig(
     throw new Error(`Failed to parse config.json: ${toErrorMessage(error)}`);
   }
 
-  const providers = CANONICAL_PROVIDER_IDS.reduce<
-    Record<CanonicalProviderId, ResolvedProviderConfig>
-  >((accumulator, providerId) => {
-    const providerConfig = configFile.providers[providerId];
-    if (!providerConfig) {
-      return accumulator;
-    }
-
-    accumulator[providerId] = resolveProviderConfig(
-      providerConfig
-    );
-    return accumulator;
-  }, {} as Record<CanonicalProviderId, ResolvedProviderConfig>);
+  const providers = Object.fromEntries(
+    Object.entries(configFile.providers ?? {}).map(([providerId, providerConfig]) => [
+      providerId,
+      resolveProviderConfig(providerConfig)
+    ])
+  );
 
   return {
     version: configFile.version,
-    defaultProvider: configFile.defaultProvider,
+    defaultModel: configFile.defaultModel,
     providers
   };
 }

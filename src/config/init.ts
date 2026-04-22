@@ -29,14 +29,14 @@ export async function initImageConfigDirectory(
   await writeIfMissing(
     paths.configFile,
     stripCommentLines(templates.configExample),
-    false,
+    options.force ?? false,
     created,
     skipped
   );
   await writeIfMissing(
     paths.configExampleFile,
     templates.configExample,
-    false,
+    options.force ?? false,
     created,
     skipped
   );

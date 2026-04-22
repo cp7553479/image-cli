@@ -139,7 +139,6 @@ function makeContext(
     providerConfig: {
       enabled: true,
       apiBaseUrl: "https://api.openai.com/v1",
-      defaultModel: "gpt-image-1",
       timeoutMs: 120000,
       retryPolicy: {
         maxAttempts: 2

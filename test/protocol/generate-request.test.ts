@@ -5,7 +5,7 @@ import { buildGenerateRequest } from "../../src/protocol/generate-request.js";
 describe("generate request building", () => {
   test("normalizes CLI-style options into a generate request", () => {
     const request = buildGenerateRequest("A poster of a cat", {
-      model: "nano-banana/gemini-2.5-flash-image",
+      model: "nano-banana/gemini-3.1-flash-image-preview",
       size: "2k",
       aspect: "16:9",
       n: "2",
@@ -13,7 +13,6 @@ describe("generate request building", () => {
       quality: "high",
       format: "png",
       background: "transparent",
-      negativePrompt: "blurry",
       seed: "7",
       stream: true,
       outputDir: "./out",
@@ -32,7 +31,6 @@ describe("generate request building", () => {
     expect(request.images).toEqual(["./input.png", "https://example.com/ref.png"]);
     expect(request.outputFormat).toBe("png");
     expect(request.background).toBe("transparent");
-    expect(request.negativePrompt).toBe("blurry");
     expect(request.seed).toBe(7);
     expect(request.stream).toBe(true);
     expect(request.outputDir).toBe("./out");
@@ -46,6 +44,22 @@ describe("generate request building", () => {
         model: ""
       })
     ).toThrow(/--model/i);
+  });
+
+  test("uses config.defaultModel when --model is omitted", () => {
+    const request = buildGenerateRequest(
+      "prompt",
+      {},
+      {
+        defaultModel: "openrouter/google/gemini-3.1-flash-image-preview"
+      }
+    );
+
+    expect(request.model).toEqual({
+      providerId: "openrouter",
+      providerAlias: "openrouter",
+      modelId: "google/gemini-3.1-flash-image-preview"
+    });
   });
 
   test("rejects invalid numeric flags", () => {

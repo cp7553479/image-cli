@@ -21,7 +21,7 @@ export type CanonicalProviderId =
   | "minimax";
 
 export type ModelRef = {
-  providerId: CanonicalProviderId;
+  providerId: string;
   providerAlias: string;
   modelId: string;
 };

@@ -168,7 +168,6 @@ function makeContext(overrides: ContextOverrides = {}): ProviderGenerateContext 
     providerConfig: {
       enabled: true,
       apiBaseUrl: "https://ark.cn-beijing.volces.com/api/v3",
-      defaultModel: "doubao-seedream-4.5",
       timeoutMs: 120000,
       retryPolicy: {
         maxAttempts: 3

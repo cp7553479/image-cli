@@ -23,6 +23,7 @@ describe("config init", () => {
     );
     await expect(access(paths.configFile, constants.F_OK)).resolves.toBeUndefined();
     await expect(access(paths.readmeFile, constants.F_OK)).resolves.toBeUndefined();
+    expect(await readFile(paths.configFile, "utf8")).toContain('"defaultModel": "openai/gpt-image-1.5"');
     expect(await readFile(paths.configFile, "utf8")).toContain('"api_key": ["YOUR_OPENAI_API_KEY"]');
     expect(await readFile(paths.readmeFile, "utf8")).toContain("config.json");
   });
@@ -31,7 +32,7 @@ describe("config init", () => {
     const homeDir = await makeTempHome("image-cli-init-existing");
     const paths = getImageConfigPaths(homeDir);
     await mkdir(paths.configDir, { recursive: true });
-    await writeFile(paths.configFile, '{"version":1,"defaultProvider":"openai","providers":{}}');
+    await writeFile(paths.configFile, '{"version":1,"defaultModel":"openai/gpt-image-1.5","providers":{}}');
     await writeFile(paths.readmeFile, "old readme");
 
     const result = await initImageConfigDirectory({ homeDir });
@@ -39,6 +40,18 @@ describe("config init", () => {
     expect(result.skipped).toContain(paths.configFile);
     expect(result.created).toContain(paths.readmeFile);
     expect(await readFile(paths.readmeFile, "utf8")).toContain("config.json");
+  });
+
+  test("overwrites config files when --force is used", async () => {
+    const homeDir = await makeTempHome("image-cli-init-force");
+    const paths = getImageConfigPaths(homeDir);
+    await mkdir(paths.configDir, { recursive: true });
+    await writeFile(paths.configFile, '{"version":1,"defaultModel":"old/provider","providers":{}}');
+
+    const result = await initImageConfigDirectory({ homeDir, force: true });
+
+    expect(result.created).toContain(paths.configFile);
+    expect(await readFile(paths.configFile, "utf8")).toContain('"defaultModel": "openai/gpt-image-1.5"');
   });
 });
 

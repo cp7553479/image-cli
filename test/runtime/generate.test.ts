@@ -147,7 +147,6 @@ function makeProviderConfig(
   return {
     enabled: true,
     apiBaseUrl: "https://example.com",
-    defaultModel: "chatgpt-image-latest",
     timeoutMs: 30_000,
     retryPolicy: {
       maxAttempts: 2

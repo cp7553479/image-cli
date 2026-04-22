@@ -28,7 +28,6 @@ function makeContext(overrides: Partial<ProviderGenerateContext> = {}): Provider
     providerConfig: {
       enabled: true,
       apiBaseUrl: "https://api.minimax.io/v1",
-      defaultModel: "image-01",
       timeoutMs: 120_000,
       retryPolicy: {
         maxAttempts: 3

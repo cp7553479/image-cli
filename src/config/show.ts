@@ -17,14 +17,13 @@ export async function getSanitizedResolvedConfig(
 
   return {
     version: resolvedConfig.version,
-    defaultProvider: resolvedConfig.defaultProvider,
+    defaultModel: resolvedConfig.defaultModel,
     providers: Object.fromEntries(
       Object.entries(resolvedConfig.providers).map(([providerId, provider]) => [
         providerId,
         {
           enabled: provider.enabled,
           apiBaseUrl: provider.apiBaseUrl,
-          defaultModel: provider.defaultModel,
           timeoutMs: provider.timeoutMs,
           retryPolicy: provider.retryPolicy,
           apiKey: {

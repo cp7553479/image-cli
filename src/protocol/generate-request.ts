@@ -20,12 +20,18 @@ type RawGenerateOptions = {
   extra?: string;
 };
 
+type BuildGenerateRequestDefaults = {
+  defaultModel?: string;
+};
+
 export function buildGenerateRequest(
   prompt: string,
-  options: RawGenerateOptions
+  options: RawGenerateOptions,
+  defaults: BuildGenerateRequestDefaults = {}
 ): GenerateRequest {
-  if (!options.model || !options.model.trim()) {
-    throw new Error("--model is required.");
+  const modelRef = options.model?.trim() || defaults.defaultModel?.trim();
+  if (!modelRef) {
+    throw new Error("--model is required unless config.defaultModel is set.");
   }
 
   const aspectRatio = options.aspect
@@ -36,7 +42,7 @@ export function buildGenerateRequest(
 
   return {
     prompt,
-    model: parseModelRef(options.model),
+    model: parseModelRef(modelRef),
     size: options.size,
     normalizedSize: normalizeSize(options.size, aspectRatio),
     aspectRatio,
@@ -45,7 +51,6 @@ export function buildGenerateRequest(
     quality: options.quality,
     outputFormat: parseOutputFormat(options.format),
     background: parseBackground(options.background),
-    negativePrompt: options.negativePrompt,
     seed: parseOptionalInteger(options.seed, "--seed"),
     stream: Boolean(options.stream),
     outputDir: options.outputDir,

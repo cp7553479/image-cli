@@ -38,13 +38,21 @@ describe("model ref parsing", () => {
     expect(() => parseModelRef("chatgpt-image-latest")).toThrow(
       /provider_id\/model_id/
     );
-    expect(() => parseModelRef("unknown/model")).toThrow(/unknown provider/i);
     expect(() => parseModelRef("openai/")).toThrow(/missing model id/i);
+    expect(() => parseModelRef("bad provider/model")).toThrow(/unknown provider|custom provider id/i);
   });
 
   test("resolves aliases without parsing a full ref", () => {
     expect(resolveProviderAlias("chatgpt-image")).toBe("openai");
     expect(resolveProviderAlias("openrouter-image")).toBe("openrouter");
     expect(resolveProviderAlias("minimax-image")).toBe("minimax");
+  });
+
+  test("accepts custom provider ids for plugin routing", () => {
+    expect(parseModelRef("custom-router/my-model")).toEqual({
+      providerId: "custom-router",
+      providerAlias: "custom-router",
+      modelId: "my-model"
+    });
   });
 });

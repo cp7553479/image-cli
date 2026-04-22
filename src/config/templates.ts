@@ -8,12 +8,11 @@ export function buildConfigTemplates(): ConfigTemplates {
     configExample: `// Copy this file to config.json and remove comments.
 {
   "version": 1,
-  "defaultProvider": "openai",
+  "defaultModel": "openai/gpt-image-1.5",
   "providers": {
     "openai": {
       "enabled": true,
       "apiBaseUrl": "https://api.openai.com/v1",
-      "defaultModel": "gpt-image-1.5",
       "timeoutMs": 120000,
       "retryPolicy": {
         "maxAttempts": 2
@@ -23,7 +22,6 @@ export function buildConfigTemplates(): ConfigTemplates {
     "openrouter": {
       "enabled": true,
       "apiBaseUrl": "https://openrouter.ai/api/v1",
-      "defaultModel": "google/gemini-3.1-flash-image-preview",
       "timeoutMs": 120000,
       "retryPolicy": {
         "maxAttempts": 2
@@ -33,7 +31,6 @@ export function buildConfigTemplates(): ConfigTemplates {
     "gemini": {
       "enabled": true,
       "apiBaseUrl": "https://generativelanguage.googleapis.com/v1beta",
-      "defaultModel": "gemini-3.1-flash-image-preview",
       "timeoutMs": 120000,
       "retryPolicy": {
         "maxAttempts": 2
@@ -43,7 +40,6 @@ export function buildConfigTemplates(): ConfigTemplates {
     "seedream": {
       "enabled": true,
       "apiBaseUrl": "https://ark.cn-beijing.volces.com/api/v3",
-      "defaultModel": "doubao-seedream-4.5",
       "timeoutMs": 120000,
       "retryPolicy": {
         "maxAttempts": 2
@@ -53,7 +49,6 @@ export function buildConfigTemplates(): ConfigTemplates {
     "qwen": {
       "enabled": true,
       "apiBaseUrl": "https://dashscope.aliyuncs.com/api/v1",
-      "defaultModel": "qwen-image-2.0-pro",
       "timeoutMs": 120000,
       "retryPolicy": {
         "maxAttempts": 2
@@ -63,7 +58,6 @@ export function buildConfigTemplates(): ConfigTemplates {
     "minimax": {
       "enabled": true,
       "apiBaseUrl": "https://api.minimax.io/v1",
-      "defaultModel": "image-01",
       "timeoutMs": 120000,
       "retryPolicy": {
         "maxAttempts": 2
@@ -77,14 +71,15 @@ export function buildConfigTemplates(): ConfigTemplates {
 
 This directory stores local configuration for the \`image\` CLI.
 
-- \`config.json\`: your active provider configuration, including \`api_key\`
+- \`config.json\`: your active provider configuration, including top-level \`defaultModel\` and per-provider \`api_key\`
 - \`config.example.jsonc\`: commented template for reference
 
 Quick start:
 
 1. Copy the structure from \`config.example.jsonc\` into \`config.json\` if needed.
-2. Fill each provider's \`api_key\` directly in \`config.json\`. It can be a string or an array of strings.
-3. Run \`image config doctor\` to verify the setup.
+2. Set top-level \`defaultModel\` to \`provider/modelid\`.
+3. Fill each provider's \`api_key\` directly in \`config.json\`. It can be a string or an array of strings.
+4. Run \`image config doctor\` to verify the setup.
 
 Notes:
 

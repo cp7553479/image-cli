@@ -32,7 +32,6 @@ describe("qwen provider", () => {
       providerConfig: {
         enabled: true,
         apiBaseUrl: "https://dashscope.aliyuncs.com/api/v1/",
-        defaultModel: "qwen-image-plus",
         timeoutMs: 30_000,
         retryPolicy: {
           maxAttempts: 3
@@ -110,7 +109,6 @@ describe("qwen provider", () => {
       providerConfig: {
         enabled: true,
         apiBaseUrl: "https://dashscope.aliyuncs.com/api/v1",
-        defaultModel: "qwen-image",
         timeoutMs: 30_000,
         retryPolicy: {
           maxAttempts: 3
@@ -185,7 +183,6 @@ describe("qwen provider", () => {
         providerConfig: {
           enabled: true,
           apiBaseUrl: "https://dashscope.aliyuncs.com/api/v1",
-          defaultModel: "qwen-image",
           timeoutMs: 30_000,
           retryPolicy: {
             maxAttempts: 3
@@ -223,7 +220,6 @@ describe("qwen provider", () => {
       providerConfig: {
         enabled: true,
         apiBaseUrl: "https://dashscope.aliyuncs.com/api/v1",
-        defaultModel: "qwen-image",
         timeoutMs: 30_000,
         retryPolicy: {
           maxAttempts: 3

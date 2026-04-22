@@ -7,7 +7,8 @@ import { getSanitizedResolvedConfig } from "../config/show.js";
 import { runConfigDoctor } from "../config/doctor.js";
 import { PROVIDER_CATALOG } from "../providers/catalog.js";
 import { buildGenerateRequest } from "../protocol/generate-request.js";
-import { runGenerateRequest } from "../runtime/generate.js";
+import { resolveDefaultModel, runGenerateRequest } from "../runtime/generate.js";
+import { loadPluginManifests } from "../plugins/loader.js";
 
 export function buildProgram(): Command {
   const program = new Command();
@@ -24,15 +25,38 @@ export function buildProgram(): Command {
       }
     })
     .addHelpText(
-      "after",
+      "afterAll",
       `
-Examples:
-  image config init
-  image config providers
-  image generate "A cinematic fox poster" --model openai/gpt-image-1.5 --size 2k --aspect 16:9
-  image generate "High-energy milk tea battle poster" --model seedream/doubao-seedream-4-5-251128 --size 2k --aspect 16:9
+Commands:
+  generate <prompt>
+    --model <provider/model>      provider/model; optional when config.defaultModel is set
+    --size <preset|WIDTHxHEIGHT>  normalized size input
+    --aspect <ratio>              normalized aspect ratio
+    --n <count>                   output count request
+    --image <pathOrUrl>           repeatable reference image input
+    --quality <value>             provider-native quality hint
+    --format <png|jpeg|webp>      preferred output format
+    --background <mode>           provider-native background mode
+    --seed <integer>              deterministic seed when supported
+    --stream                      enable streaming when supported
+    --output-dir <path>           output directory
+    --json                        print manifest JSON
+    --extra <json>                provider-only JSON parameters
 
-Use "image <command> --help" for full command details.
+  config init
+    --force                       overwrite ~/.image files
+
+  config path
+    no parameters
+
+  config show
+    --json                        print JSON output
+
+  config doctor
+    --json                        print JSON output
+
+  config providers
+    --json                        print JSON output
 `
     );
 
@@ -45,7 +69,7 @@ Use "image <command> --help" for full command details.
     .configureHelp({
       commandUsage: () => "image generate <prompt>"
     })
-    .requiredOption("--model <provider/model>", "provider_id/model_id")
+    .option("--model <provider/model>", "provider/model; defaults to config.defaultModel when omitted")
     .option("--size <preset|WIDTHxHEIGHT>", "size preset (`2k`, `4k`) or explicit dimensions (`WIDTHxHEIGHT`)")
     .option("--aspect <ratio>", "target aspect ratio: 1:1, 4:3, 3:4, 16:9, 9:16, 3:2, 2:3, 21:9")
     .option("--n <count>", "number of output images requested")
@@ -59,6 +83,9 @@ Use "image <command> --help" for full command details.
     .option("--json", "print JSON manifest instead of plain-text summary")
     .option("--extra <json>", "provider-specific JSON object; use this for provider-only fields such as Qwen negative_prompt")
     .action(async (prompt, options) => {
+      const defaultModel = options.model
+        ? undefined
+        : await resolveDefaultModel().catch(() => undefined);
       const request = buildGenerateRequest(prompt, {
         model: options.model,
         size: options.size,
@@ -73,6 +100,8 @@ Use "image <command> --help" for full command details.
         outputDir: options.outputDir,
         json: options.json,
         extra: options.extra
+      }, {
+        defaultModel
       });
 
       const manifest = await runGenerateRequest(request);
@@ -98,7 +127,7 @@ Use "image <command> --help" for full command details.
     "after",
     `
 Provider coverage:
-  --model           required for all providers
+  --model           explicit provider/model; falls back to config.defaultModel when present
   --size            normalized by the CLI, then mapped per provider
   --aspect          normalized by the CLI, then mapped per provider
   --n               supported by some providers; others may clamp or ignore it
@@ -110,10 +139,9 @@ Provider coverage:
   --stream          provider-specific
   --extra           required for provider-only parameters not standardized by the CLI
 
-Examples:
-  image generate "Studio mug product shot" --model seedream/doubao-seedream-4-5-251128 --size 2k
-  image generate "Launch poster" --model openrouter/google/gemini-3.1-flash-image-preview --size 4k --aspect 16:9
-  image generate "Qwen scene" --model qwen/qwen-image-2.0-pro --extra '{"negative_prompt":"low quality, blurry"}'
+Routing:
+  config.defaultModel uses the form "provider/modelid"
+  example value: "openrouter/google/gemini-3.1-flash-image-preview"
 `
   );
 
@@ -125,8 +153,11 @@ Examples:
   configCommand
     .command("init")
     .description("Create ~/.image config files without overwriting existing config.json.")
-    .action(async () => {
-      const result = await initImageConfigDirectory();
+    .option("--force", "overwrite ~/.image/config.json and ~/.image/config.example.jsonc")
+    .action(async (options) => {
+      const result = await initImageConfigDirectory({
+        force: Boolean(options.force)
+      });
       process.stdout.write(`Created:\n`);
       for (const filePath of result.created) {
         process.stdout.write(`${filePath}\n`);
@@ -178,10 +209,22 @@ Examples:
     .option("--json", "print JSON output")
     .action((options) => {
       if (options.json) {
-        process.stdout.write(`${JSON.stringify(PROVIDER_CATALOG, null, 2)}\n`);
+        const pluginEntries = loadPluginManifests().map((manifest) => ({
+          providerId: manifest.providerId,
+          aliases: manifest.aliases ?? [],
+          defaultBaseUrl: "plugin-defined",
+          description: manifest.description ?? "Local plugin provider"
+        }));
+        process.stdout.write(`${JSON.stringify([...PROVIDER_CATALOG, ...pluginEntries], null, 2)}\n`);
         return;
       }
-      for (const provider of PROVIDER_CATALOG) {
+      const pluginEntries = loadPluginManifests().map((manifest) => ({
+        providerId: manifest.providerId,
+        aliases: manifest.aliases ?? [],
+        defaultBaseUrl: "plugin-defined",
+        description: manifest.description ?? "Local plugin provider"
+      }));
+      for (const provider of [...PROVIDER_CATALOG, ...pluginEntries]) {
         process.stdout.write(
           `${provider.providerId}: ${provider.description} [aliases: ${provider.aliases.join(", ") || "none"}]\n`
         );
@@ -192,11 +235,11 @@ Examples:
     "after",
     `
 Subcommands:
-  init       create ~/.image/config.json if missing, refresh ~/.image/README.md
+  init       create ~/.image/config.json if missing, refresh ~/.image/README.md, or overwrite with --force
   path       print the config file paths used by the CLI
-  show       print sanitized config with api_key presence only
+  show       print sanitized config with defaultModel and api_key presence only
   doctor     verify config files, curl availability, and credential counts
-  providers  list built-in provider ids, aliases, and descriptions
+  providers  list built-in and plugin provider ids, aliases, and descriptions
 `
   );
 

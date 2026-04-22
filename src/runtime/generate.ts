@@ -84,7 +84,9 @@ export async function runGenerateRequest(
     homeDir: options.homeDir,
     env: options.env
   });
-  const providerPlugin = getProviderPlugin(request.model.providerId);
+  const providerPlugin = getProviderPlugin(request.model.providerId, {
+    homeDir: options.homeDir
+  });
   const providerConfig = resolvedConfig.providers[request.model.providerId];
   if (!providerConfig) {
     throw new Error(
@@ -112,6 +114,11 @@ export async function runGenerateRequest(
     outputDir,
     result
   });
+}
+
+export async function resolveDefaultModel(homeDir?: string): Promise<string | undefined> {
+  const resolvedConfig = await loadResolvedConfig({ homeDir });
+  return resolvedConfig.defaultModel;
 }
 
 function defaultOutputDir(): string {

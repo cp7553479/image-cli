@@ -8,8 +8,9 @@ describe("CLI help", () => {
     const help = program.helpInformation();
 
     expect(help).toContain("image");
-    expect(help).toContain("generate");
+    expect(help).toContain("generate <prompt>");
     expect(help).toContain("config");
+    expect(help).toContain("Commands:");
   });
 
   test("documents generate options", () => {
@@ -21,6 +22,7 @@ describe("CLI help", () => {
     expect(generateHelp).toContain("--extra <json>");
     expect(generateHelp).not.toContain("--negative-prompt");
     expect(generateHelp).toContain("Usage: image generate <prompt>");
+    expect(generateHelp).toContain("config.defaultModel");
   });
 
   test("documents config subcommands", () => {

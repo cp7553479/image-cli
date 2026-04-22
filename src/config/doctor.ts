@@ -29,7 +29,7 @@ export async function runConfigDoctor(
       env: options.env
     });
     resolvedConfig = {
-      defaultProvider: config.defaultProvider,
+      defaultModel: config.defaultModel,
       providers: Object.fromEntries(
         Object.entries(config.providers).map(([providerId, provider]) => [
           providerId,

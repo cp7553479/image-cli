@@ -132,7 +132,6 @@ function makeContext(
     providerConfig: {
       enabled: true,
       apiBaseUrl: "https://openrouter.ai/api/v1",
-      defaultModel: "google/gemini-3.1-flash-image-preview",
       timeoutMs: 30000,
       retryPolicy: {
         maxAttempts: 2
