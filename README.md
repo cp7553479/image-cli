@@ -1,4 +1,6 @@
-# `@cp7553479/image-cli`
+# Image-Cli: An agent-native image tool
+
+[中文说明 / README_CN](./README_CN.md)
 
 `image` is a local multi-provider image generation CLI.
 
@@ -440,25 +442,90 @@ Seedream note:
 
 ## Custom Provider Plugins
 
-Custom providers can be installed under:
+You only need this section if you want `image` to call a provider that is not built in.
+
+For normal use of built-in providers, skip this section.
+
+### Why does this feature exist?
+
+The CLI keeps one stable user-facing command surface:
+
+- `image generate "<prompt>"`
+- `--model provider/modelid`
+- `--size`
+- `--aspect`
+- `--image`
+- `--extra`
+
+But every provider has different implementation details:
+
+- auth header format
+- request body format
+- sync vs async flow
+- where image results are returned
+
+The built-in providers solve this internally.
+
+The custom plugin system exists so you can add the same kind of adapter for a provider that is not shipped with the CLI, without changing the CLI itself.
+
+### How should a beginner think about it?
+
+Do not think of a plugin as "extending the whole CLI".
+
+Think of it as only adding one translator layer:
+
+- the CLI already knows how to parse commands, load config, rotate keys, and save output
+- the plugin only teaches the CLI how to talk to one extra provider
+
+In practice, that means:
+
+1. you still run the normal `image generate ...` command
+2. the provider id still appears in `config.json` and `--model`
+3. the plugin only converts between the CLI's normalized request and the provider's real API
+
+### Where does a plugin live?
+
+Custom providers are installed under:
 
 ```text
 ~/.image/plugins/<plugin-name>/
 ```
 
-The plugin manifest is:
+Each plugin must contain a registration file:
 
 ```text
 ~/.image/plugins/<plugin-name>/plugin.json
 ```
 
-Custom providers are routed exactly like built-in ones:
+### How is a plugin routed?
+
+Once a plugin registers a `providerId`, the CLI routes it exactly like a built-in provider.
+
+The same provider id appears in:
 
 - in `config.defaultModel`
 - in `image generate --model <provider/model>`
 - in `config.providers.<providerId>`
 
-For the full plugin contract, script I/O rules, manifest schema, and development guide, see:
+### What is the minimum mental model?
+
+For a newcomer, this is the shortest accurate explanation:
+
+- `plugin.json` says which provider id the plugin owns
+- the plugin script builds the real HTTP request for that provider
+- the plugin script parses the provider response back into the CLI's common result format
+
+If you understand those three lines, you understand the plugin system.
+
+### Where is the full developer guide?
+
+For the full explanation, including:
+
+- the beginner-friendly architecture walkthrough
+- what `plugin.json` does
+- what `build-generate` and `parse-generate` do
+- what JSON comes in and out
+- common beginner mistakes and questions
 
 - [plugins/PLUGINS_README.md](plugins/PLUGINS_README.md)
 

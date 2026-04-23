@@ -1,4 +1,6 @@
-# `@cp7553479/image-cli`
+# Image-Cli：面向 Agent 的原生图片工具
+
+[English README](./README.md)
 
 `image` 是一个本地多厂商生图 CLI。
 
@@ -446,25 +448,90 @@ Seedream 特别说明：
 
 ## 自定义 Provider 插件
 
+只有当你要接入一个“CLI 内置列表里没有的 provider”时，才需要看这一节。
+
+如果你只是使用 OpenAI、OpenRouter、Gemini、Seedream、Qwen、MiniMax，可以直接跳过。
+
+### 为什么要有这个能力？
+
+`image` 这个 CLI 希望把用户看到的命令保持稳定，例如：
+
+- `image generate "<prompt>"`
+- `--model provider/modelid`
+- `--size`
+- `--aspect`
+- `--image`
+- `--extra`
+
+但不同厂商的真实 API 并不统一，例如：
+
+- 鉴权 header 怎么写
+- 请求 body 长什么样
+- 是同步返回还是异步任务
+- 图片 URL 或 base64 藏在哪个字段里
+
+内置 provider 已经把这些差异处理掉了。
+
+插件机制的作用，就是让你在“不修改 CLI 主体代码”的前提下，给一个新的 provider 补上一层适配。
+
+### 新手应该怎么理解？
+
+不要把插件理解成“改造整个 CLI”。
+
+更准确的理解是：你只是给 CLI 新增了一个“翻译器”。
+
+- CLI 本身已经会解析命令、读取配置、做 key failover、保存输出
+- 插件只负责告诉 CLI：这个新 provider 的 API 应该怎么调用，返回结果应该怎么解释
+
+所以从使用者角度看，仍然还是原来的命令：
+
+1. 还是执行 `image generate ...`
+2. 还是在 `config.json` 里配置 provider
+3. 还是通过 `provider/modelid` 路由
+
+### 插件放在哪里？
+
 自定义 provider 安装目录：
 
 ```text
 ~/.image/plugins/<plugin-name>/
 ```
 
-插件注册表：
+每个插件至少要有一个注册文件：
 
 ```text
 ~/.image/plugins/<plugin-name>/plugin.json
 ```
 
-插件 provider 的路由方式和内置 provider 一样：
+### 插件是怎么被路由到的？
+
+只要插件声明了一个 `providerId`，CLI 就会像处理内置 provider 一样处理它。
+
+同一个 provider id 会同时出现在：
 
 - `config.defaultModel`
 - `image generate --model <provider/model>`
 - `config.providers.<providerId>`
 
-完整插件接口、脚本入参与出参规范、manifest 字段说明、开发指南请看：
+### 最短理解版本
+
+如果你第一次看这套机制，先记住这三句话就够了：
+
+- `plugin.json` 负责声明“这个 provider 由谁实现”
+- 插件脚本负责把统一 CLI 请求翻译成厂商真实请求
+- 插件脚本负责把厂商真实响应翻译回 CLI 的统一结果格式
+
+理解这三句，基本就知道插件机制在做什么了。
+
+### 完整开发文档
+
+下面这份文档里我已经补了更适合新手阅读的内容，包括：
+
+- 这套机制的原理
+- `plugin.json` 到底是什么
+- `build-generate` 和 `parse-generate` 分别干什么
+- 脚本 stdin / stdout 的 JSON 规范
+- 新手最常见的疑问和坑
 
 - [plugins/PLUGINS_README.md](plugins/PLUGINS_README.md)
 
