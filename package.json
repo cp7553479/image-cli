@@ -1,6 +1,6 @@
 {
   "name": "@cp7553479/image-cli",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Unified image generation CLI with provider plugins and shared configuration.",
   "type": "module",
   "bin": {
