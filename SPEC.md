@@ -271,6 +271,16 @@ Files:
 - `~/.image/config.json`
 - `~/.image/config.example.jsonc`
 - `~/.image/README.md`
+- `~/.image/skills/image-cli/SKILL.md`
+- `~/.image/skills/image-cli/README.md`
+- `~/.claude/skills/image-cli/SKILL.md`
+- `~/.claude/skills/image-cli/README.md`
+- `~/.agents/skills/image-cli/SKILL.md`
+- `~/.agents/skills/image-cli/README.md`
+- `~/.codex/skills/image-cli/SKILL.md`
+- `~/.codex/skills/image-cli/README.md`
+- `~/antigravity/skills/image-cli/SKILL.md`
+- `~/antigravity/skills/image-cli/README.md`
 
 ### `config.json`
 

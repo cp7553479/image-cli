@@ -37,4 +37,5 @@ export type ImageConfigPaths = {
   configFile: string;
   configExampleFile: string;
   readmeFile: string;
+  skillInstallDirs: string[];
 };

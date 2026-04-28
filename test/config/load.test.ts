@@ -13,7 +13,14 @@ describe("config loading", () => {
       configDir: "/tmp/fake-home/.image",
       configFile: "/tmp/fake-home/.image/config.json",
       readmeFile: "/tmp/fake-home/.image/README.md",
-      configExampleFile: "/tmp/fake-home/.image/config.example.jsonc"
+      configExampleFile: "/tmp/fake-home/.image/config.example.jsonc",
+      skillInstallDirs: [
+        "/tmp/fake-home/.image/skills/image-cli",
+        "/tmp/fake-home/.claude/skills/image-cli",
+        "/tmp/fake-home/.agents/skills/image-cli",
+        "/tmp/fake-home/.codex/skills/image-cli",
+        "/tmp/fake-home/antigravity/skills/image-cli"
+      ]
     });
   });
 

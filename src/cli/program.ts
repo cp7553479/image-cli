@@ -44,7 +44,7 @@ Commands:
     --extra <json>                provider-only JSON parameters
 
   config init
-    --force                       overwrite ~/.image files
+    --force                       overwrite ~/.image config files
 
   config path
     no parameters
@@ -147,13 +147,13 @@ Routing:
 
   const configCommand = program
     .command("config")
-    .description("Manage ~/.image configuration.")
+    .description("Manage image CLI configuration and installed skills.")
     .summary("Manage local config.");
 
   configCommand
     .command("init")
-    .description("Create ~/.image config files without overwriting existing config.json.")
-    .option("--force", "overwrite ~/.image/config.json and ~/.image/config.example.jsonc")
+    .description("Copy missing init template files into ~/.image and supported skill directories.")
+    .option("--force", "overwrite all managed ~/.image and skill files")
     .action(async (options) => {
       const result = await initImageConfigDirectory({
         force: Boolean(options.force)
@@ -172,7 +172,7 @@ Routing:
 
   configCommand
     .command("path")
-    .description("Show the paths used under ~/.image.")
+    .description("Show the config and skill paths used by the CLI.")
     .action(() => {
       process.stdout.write(`${JSON.stringify(getImageConfigPaths(os.homedir()), null, 2)}\n`);
     });
@@ -235,8 +235,8 @@ Routing:
     "after",
     `
 Subcommands:
-  init       create ~/.image/config.json if missing, refresh ~/.image/README.md, or overwrite with --force
-  path       print the config file paths used by the CLI
+  init       fill missing config and skill files, or overwrite all managed files with --force
+  path       print the config and skill paths used by the CLI
   show       print sanitized config with defaultModel and api_key presence only
   doctor     verify config files, curl availability, and credential counts
   providers  list built-in and plugin provider ids, aliases, and descriptions

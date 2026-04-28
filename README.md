@@ -228,24 +228,29 @@ image generate "A clean drink poster" \
 
 ### `image config init`
 
-Initializes `~/.image/`.
+Copies the initialization templates into `~/.image/` and the supported skill directories.
 
 Behavior:
 
 - creates `config.json` if missing
 - creates `config.example.jsonc` if missing
-- always refreshes `README.md`
-- does not overwrite `config.json` unless `--force` is used
-- does not overwrite `config.example.jsonc` unless `--force` is used
+- creates `README.md` if missing
+- creates missing bundled `image-cli` skill files under `~/.image/skills/image-cli/`
+- creates missing bundled `image-cli` skill files under `~/.claude/skills/image-cli/`
+- creates missing bundled `image-cli` skill files under `~/.agents/skills/image-cli/`
+- creates missing bundled `image-cli` skill files under `~/.codex/skills/image-cli/`
+- creates missing bundled `image-cli` skill files under `~/antigravity/skills/image-cli/`
+- if `~/.image/` already exists, it checks each managed file and only fills the missing ones
+- `--force` overwrites all managed config and skill files
 
 Flags:
 
 - `--force`
-  Overwrite `~/.image/config.json` and `~/.image/config.example.jsonc`.
+  Overwrite all managed config and skill files.
 
 ### `image config path`
 
-Prints the paths used by the CLI under `~/.image/`.
+Prints the config and skill paths used by the CLI.
 
 No flags.
 
@@ -302,6 +307,16 @@ The CLI uses:
 - [`~/.image/config.json`](/Users/vincent/.image/config.json)
 - [`~/.image/config.example.jsonc`](/Users/vincent/.image/config.example.jsonc)
 - [`~/.image/README.md`](/Users/vincent/.image/README.md)
+- `~/.image/skills/image-cli/SKILL.md`
+- `~/.image/skills/image-cli/README.md`
+- `~/.claude/skills/image-cli/SKILL.md`
+- `~/.claude/skills/image-cli/README.md`
+- `~/.agents/skills/image-cli/SKILL.md`
+- `~/.agents/skills/image-cli/README.md`
+- `~/.codex/skills/image-cli/SKILL.md`
+- `~/.codex/skills/image-cli/README.md`
+- `~/antigravity/skills/image-cli/SKILL.md`
+- `~/antigravity/skills/image-cli/README.md`
 - `~/.image/plugins/<plugin-name>/plugin.json`
 
 ## `config.json`

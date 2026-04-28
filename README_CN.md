@@ -236,24 +236,29 @@ image generate "干净的饮品海报" \
 
 ### `image config init`
 
-初始化 `~/.image/`。
+把初始化模板复制到 `~/.image/` 和受支持的 skill 目录。
 
 行为：
 
 - `config.json` 不存在时创建
 - `config.example.jsonc` 不存在时创建
-- 每次都会刷新 `README.md`
-- 默认不会覆盖已有 `config.json`
-- 默认不会覆盖已有 `config.example.jsonc`
+- `README.md` 不存在时创建
+- `~/.image/skills/image-cli/` 下缺失的内置 `image-cli` skill 文件会补齐
+- `~/.claude/skills/image-cli/` 下缺失的内置 `image-cli` skill 文件会补齐
+- `~/.agents/skills/image-cli/` 下缺失的内置 `image-cli` skill 文件会补齐
+- `~/.codex/skills/image-cli/` 下缺失的内置 `image-cli` skill 文件会补齐
+- `~/antigravity/skills/image-cli/` 下缺失的内置 `image-cli` skill 文件会补齐
+- 如果 `~/.image/` 已存在，会逐个检查托管文件，缺什么补什么
+- `--force` 会覆盖所有托管的配置和 skill 文件
 
 Flags：
 
 - `--force`
-  强制覆盖 `~/.image/config.json` 和 `~/.image/config.example.jsonc`
+  强制覆盖所有托管的配置和 skill 文件
 
 ### `image config path`
 
-打印 CLI 使用的配置路径。
+打印 CLI 使用的配置和 skill 路径。
 
 无参数。
 
@@ -310,6 +315,16 @@ CLI 使用：
 - [`~/.image/config.json`](/Users/vincent/.image/config.json)
 - [`~/.image/config.example.jsonc`](/Users/vincent/.image/config.example.jsonc)
 - [`~/.image/README.md`](/Users/vincent/.image/README.md)
+- `~/.image/skills/image-cli/SKILL.md`
+- `~/.image/skills/image-cli/README.md`
+- `~/.claude/skills/image-cli/SKILL.md`
+- `~/.claude/skills/image-cli/README.md`
+- `~/.agents/skills/image-cli/SKILL.md`
+- `~/.agents/skills/image-cli/README.md`
+- `~/.codex/skills/image-cli/SKILL.md`
+- `~/.codex/skills/image-cli/README.md`
+- `~/antigravity/skills/image-cli/SKILL.md`
+- `~/antigravity/skills/image-cli/README.md`
 - `~/.image/plugins/<plugin-name>/plugin.json`
 
 ## `config.json`

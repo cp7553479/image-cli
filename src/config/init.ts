@@ -1,8 +1,9 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import path from "node:path";
+import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import os from "node:os";
 
 import { getImageConfigPaths } from "./paths.js";
-import { buildConfigTemplates } from "./templates.js";
+import { getConfigTemplatePaths } from "./templates.js";
 
 type InitImageConfigDirectoryOptions = {
   homeDir?: string;
@@ -19,28 +20,16 @@ export async function initImageConfigDirectory(
 ): Promise<InitImageConfigDirectoryResult> {
   const homeDir = options.homeDir ?? os.homedir();
   const paths = getImageConfigPaths(homeDir);
-  const templates = buildConfigTemplates();
-
-  await mkdir(paths.configDir, { recursive: true });
+  const templatePaths = getConfigTemplatePaths();
 
   const created: string[] = [];
   const skipped: string[] = [];
+  const force = options.force ?? false;
 
-  await writeIfMissing(
-    paths.configFile,
-    stripCommentLines(templates.configExample),
-    options.force ?? false,
-    created,
-    skipped
-  );
-  await writeIfMissing(
-    paths.configExampleFile,
-    templates.configExample,
-    options.force ?? false,
-    created,
-    skipped
-  );
-  await writeAlways(paths.readmeFile, templates.readme, created);
+  await copyTemplateDirectory(templatePaths.templateDir, paths.configDir, force, created, skipped);
+  for (const skillDir of paths.skillInstallDirs.slice(1)) {
+    await copyTemplateDirectory(templatePaths.skillDir, skillDir, force, created, skipped);
+  }
 
   return {
     created,
@@ -48,43 +37,55 @@ export async function initImageConfigDirectory(
   };
 }
 
-async function writeIfMissing(
-  filePath: string,
-  contents: string,
+async function copyTemplateDirectory(
+  sourceDir: string,
+  targetDir: string,
   force: boolean,
   created: string[],
   skipped: string[]
 ): Promise<void> {
+  await mkdir(targetDir, { recursive: true });
+  const entries = await readdir(sourceDir, { withFileTypes: true });
+  entries.sort((left, right) => left.name.localeCompare(right.name));
+
+  for (const entry of entries) {
+    if (entry.name === ".DS_Store") {
+      continue;
+    }
+    const sourcePath = path.join(sourceDir, entry.name);
+    const targetPath = path.join(targetDir, entry.name);
+    if (entry.isDirectory()) {
+      await copyTemplateDirectory(sourcePath, targetPath, force, created, skipped);
+      continue;
+    }
+    if (entry.isFile()) {
+      await copyTemplateFile(sourcePath, targetPath, force, created, skipped);
+    }
+  }
+}
+
+async function copyTemplateFile(
+  sourcePath: string,
+  targetPath: string,
+  force: boolean,
+  created: string[],
+  skipped: string[]
+): Promise<void> {
+  const contents = await readFile(sourcePath);
   try {
-    await writeFile(filePath, contents, {
+    await writeFile(targetPath, contents, {
       flag: force ? "w" : "wx"
     });
-    created.push(filePath);
+    created.push(targetPath);
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    if (message.includes("EEXIST")) {
-      skipped.push(filePath);
+    if (isExistingFileError(error)) {
+      skipped.push(targetPath);
       return;
     }
     throw error;
   }
 }
 
-async function writeAlways(
-  filePath: string,
-  contents: string,
-  created: string[]
-): Promise<void> {
-  await writeFile(filePath, contents, {
-    flag: "w"
-  });
-  created.push(filePath);
-}
-
-function stripCommentLines(contents: string): string {
-  return contents
-    .split("\n")
-    .filter((line) => !line.trim().startsWith("//") && !line.trim().startsWith("#"))
-    .join("\n")
-    .trimStart();
+function isExistingFileError(error: unknown): boolean {
+  return typeof error === "object" && error !== null && "code" in error && error.code === "EEXIST";
 }

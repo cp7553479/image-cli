@@ -8,6 +8,13 @@ export function getImageConfigPaths(homeDir: string): ImageConfigPaths {
     configDir,
     configFile: path.join(configDir, "config.json"),
     configExampleFile: path.join(configDir, "config.example.jsonc"),
-    readmeFile: path.join(configDir, "README.md")
+    readmeFile: path.join(configDir, "README.md"),
+    skillInstallDirs: [
+      path.join(configDir, "skills", "image-cli"),
+      path.join(homeDir, ".claude", "skills", "image-cli"),
+      path.join(homeDir, ".agents", "skills", "image-cli"),
+      path.join(homeDir, ".codex", "skills", "image-cli"),
+      path.join(homeDir, "antigravity", "skills", "image-cli")
+    ]
   };
 }
