@@ -15,6 +15,9 @@ type InitImageConfigDirectoryResult = {
   skipped: string[];
 };
 
+/**
+ * initImageConfigDirectory 的导出入口。
+ */
 export async function initImageConfigDirectory(
   options: InitImageConfigDirectoryOptions = {}
 ): Promise<InitImageConfigDirectoryResult> {

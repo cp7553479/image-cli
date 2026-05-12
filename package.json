@@ -19,7 +19,8 @@
     "check": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "lint": "eslint \"src/**/*.ts\""
   },
   "keywords": [
     "image",
@@ -49,6 +50,8 @@
   },
   "devDependencies": {
     "@types/node": "^24.6.2",
+    "eslint": "^9.36.0",
+    "eslint-plugin-jsdoc": "^50.6.17",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3",
     "vitest": "^3.2.4"

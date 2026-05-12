@@ -7,6 +7,9 @@ export type ProviderCatalogEntry = {
   description: string;
 };
 
+/**
+ * PROVIDER_CATALOG 的导出入口。
+ */
 export const PROVIDER_CATALOG: ProviderCatalogEntry[] = [
   {
     providerId: "openai",

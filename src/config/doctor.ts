@@ -10,6 +10,9 @@ type DoctorOptions = {
   env?: Record<string, string | undefined>;
 };
 
+/**
+ * runConfigDoctor 的导出入口。
+ */
 export async function runConfigDoctor(
   options: DoctorOptions = {}
 ): Promise<Record<string, unknown>> {

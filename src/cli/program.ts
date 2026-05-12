@@ -10,6 +10,9 @@ import { buildGenerateRequest } from "../protocol/generate-request.js";
 import { resolveDefaultModel, runGenerateRequest } from "../runtime/generate.js";
 import { loadPluginManifests } from "../plugins/loader.js";
 
+/**
+ * buildProgram 的导出入口。
+ */
 export function buildProgram(): Command {
   const program = new Command();
   program

@@ -7,6 +7,9 @@ type ShowConfigOptions = {
   env?: Record<string, string | undefined>;
 };
 
+/**
+ * getSanitizedResolvedConfig 的导出入口。
+ */
 export async function getSanitizedResolvedConfig(
   options: ShowConfigOptions = {}
 ): Promise<Record<string, unknown>> {

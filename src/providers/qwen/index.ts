@@ -14,12 +14,14 @@ import type {
   ProviderPlugin
 } from "../types.js";
 
+/** Qwen API 默认基地址。用于拼接同步/异步端点。 */
 const DEFAULT_BASE_URL = "https://dashscope.aliyuncs.com/api/v1";
 const SYNC_ENDPOINT = "/services/aigc/multimodal-generation/generation";
 const ASYNC_ENDPOINT = "/services/aigc/text2image/image-synthesis";
 const TASK_ENDPOINT = "/tasks";
 const ASYNC_HEADER_NAME = "X-DashScope-Async";
 const ASYNC_HEADER_VALUE = "enable";
+/** 异步任务最大轮询次数（次）。超过后视为超时失败。 */
 const MAX_POLL_ATTEMPTS = 30;
 
 type QwenResponse = {
@@ -42,6 +44,9 @@ type QwenResponse = {
   };
 };
 
+/**
+ * qwenProvider 的导出入口。
+ */
 export const qwenProvider: ProviderPlugin = {
   providerId: "qwen",
   aliases: ["qwen", "qwen-image", "qwen-image-plus"],
@@ -300,6 +305,7 @@ function extractImages(payload: QwenResponse): ProviderImageResult[] {
   return images;
 }
 
+/** 规范化 provider base URL，去除尾部斜杠并在空值时回退默认地址。 */
 function normalizeBaseUrl(value: string): string {
   const trimmed = value.trim();
   if (!trimmed) {

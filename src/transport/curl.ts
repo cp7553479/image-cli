@@ -40,6 +40,11 @@ export type CurlDownloadRequest = {
   timeoutMs?: number;
 };
 
+/**
+ * 通过 curl 执行 HTTP 请求并返回状态、头和响应体。
+ * @param request curl 请求描述。
+ * @returns 响应元数据与文本内容。
+ */
 export async function executeCurlRequest(
   request: CurlRequest
 ): Promise<CurlExecutionResult> {
@@ -98,6 +103,11 @@ export async function executeCurlRequest(
   }
 }
 
+/**
+ * 下载 URL 内容到目标文件路径。
+ * @param request 下载参数。
+ * @returns 下载完成后无返回值。
+ */
 export async function downloadCurlFile(
   request: CurlDownloadRequest
 ): Promise<void> {

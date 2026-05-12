@@ -27,6 +27,9 @@ type OpenRouterResponse = {
   }>;
 };
 
+/**
+ * openrouterProviderPlugin 的导出入口。
+ */
 export const openrouterProviderPlugin: ProviderPlugin = {
   providerId: "openrouter",
   aliases: ["openrouter", "openrouter-image"],
