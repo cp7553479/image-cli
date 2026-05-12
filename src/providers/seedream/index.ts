@@ -10,6 +10,9 @@ import type { CurlExecutionResult } from "../../transport/curl.js";
 const DEFAULT_BASE_URL = "https://ark.cn-beijing.volces.com/api/v3";
 const TEMPORARY_URL_WARNING = "Temporary URL; expires in 24 hours.";
 
+/**
+ * seedreamProviderPlugin 的导出入口。
+ */
 export const seedreamProviderPlugin: ProviderPlugin = {
   providerId: "seedream",
   aliases: ["seedream", "doubao-seedream", "doubao-seedream-4.0", "doubao-seedream-4.5"],

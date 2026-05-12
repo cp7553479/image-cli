@@ -17,6 +17,9 @@ const PROVIDERS: Record<string, ProviderPlugin> = {
   minimax: minimaxProviderPlugin
 };
 
+/**
+ * getProviderPlugin 的导出入口。
+ */
 export function getProviderPlugin(providerId: string, options?: { homeDir?: string }): ProviderPlugin {
   const builtIn = PROVIDERS[providerId];
   if (builtIn) {
@@ -31,6 +34,9 @@ export function getProviderPlugin(providerId: string, options?: { homeDir?: stri
   throw new Error(`Unknown provider "${providerId}".`);
 }
 
+/**
+ * listProviderPlugins 的导出入口。
+ */
 export function listProviderPlugins(options?: { homeDir?: string }): ProviderPlugin[] {
   const pluginProviders = loadPluginManifests(options?.homeDir).map((manifest) =>
     findPluginProvider(manifest.providerId, options?.homeDir)

@@ -6,6 +6,9 @@ type Dimensions = {
   height: number;
 };
 
+/**
+ * SIZE_PRESETS 的导出入口。
+ */
 export const SIZE_PRESETS: Record<SizePreset, Record<SupportedAspectRatio, Dimensions>> = {
   "2k": {
     "1:1": { width: 2048, height: 2048 },
@@ -32,6 +35,9 @@ export const SIZE_PRESETS: Record<SizePreset, Record<SupportedAspectRatio, Dimen
 const PRESET_NAMES = Object.keys(SIZE_PRESETS) as SizePreset[];
 const EXPLICIT_SIZE_PATTERN = /^(\d+)x(\d+)$/i;
 
+/**
+ * parseAspectRatio 的导出入口。
+ */
 export function parseAspectRatio(value: string): SupportedAspectRatio {
   const normalized = value.trim() as SupportedAspectRatio;
   if (!SUPPORTED_ASPECT_RATIOS.includes(normalized)) {
@@ -42,6 +48,9 @@ export function parseAspectRatio(value: string): SupportedAspectRatio {
   return normalized;
 }
 
+/**
+ * normalizeSize 的导出入口。
+ */
 export function normalizeSize(
   rawSize?: string,
   rawAspect?: string

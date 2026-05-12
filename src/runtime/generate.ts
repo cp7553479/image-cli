@@ -22,6 +22,12 @@ type ExecuteGenerateWithFailoverOptions = {
   execute: (request: CurlRequest) => Promise<CurlExecutionResult>;
 };
 
+/**
+ * 依次尝试 provider 凭证执行生成请求。
+ * @param options 运行参数与执行器。
+ * @returns 首个成功解析的生成结果。
+ * @throws 当所有凭证失败或遇到不可重试错误时抛出。
+ */
 export async function executeGenerateWithFailover(
   options: ExecuteGenerateWithFailoverOptions
 ): Promise<GenerateResult> {
@@ -76,6 +82,12 @@ type RunGenerateRequestOptions = {
   env?: Record<string, string | undefined>;
 };
 
+/**
+ * 执行一次完整的生成调用（加载配置、执行请求、落盘输出）。
+ * @param request 标准化生成请求。
+ * @param options 可选环境覆盖。
+ * @returns 输出清单。
+ */
 export async function runGenerateRequest(
   request: GenerateRequest,
   options: RunGenerateRequestOptions = {}
@@ -116,6 +128,9 @@ export async function runGenerateRequest(
   });
 }
 
+/**
+ * resolveDefaultModel 的导出入口。
+ */
 export async function resolveDefaultModel(homeDir?: string): Promise<string | undefined> {
   const resolvedConfig = await loadResolvedConfig({ homeDir });
   return resolvedConfig.defaultModel;

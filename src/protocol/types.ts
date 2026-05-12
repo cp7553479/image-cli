@@ -1,3 +1,6 @@
+/**
+ * SUPPORTED_ASPECT_RATIOS 的导出入口。
+ */
 export const SUPPORTED_ASPECT_RATIOS = [
   "1:1",
   "4:3",

@@ -15,6 +15,9 @@ export type ConfigTemplates = {
   skillReadme: string;
 };
 
+/**
+ * getConfigTemplatePaths 的导出入口。
+ */
 export function getConfigTemplatePaths(): ConfigTemplatePaths {
   const templateRoot = resolveConfigTemplateRoot(import.meta.url);
   return {
@@ -23,6 +26,9 @@ export function getConfigTemplatePaths(): ConfigTemplatePaths {
   };
 }
 
+/**
+ * resolveConfigTemplateRoot 的导出入口。
+ */
 export function resolveConfigTemplateRoot(moduleUrl: string): string {
   const candidates = [
     fileURLToPath(new URL("../../templates/init", moduleUrl)),
@@ -31,6 +37,9 @@ export function resolveConfigTemplateRoot(moduleUrl: string): string {
   return path.resolve(candidates.find((candidate) => existsSync(candidate)) ?? candidates[0]);
 }
 
+/**
+ * buildConfigTemplates 的导出入口。
+ */
 export function buildConfigTemplates(): ConfigTemplates {
   const paths = getConfigTemplatePaths();
   return {
