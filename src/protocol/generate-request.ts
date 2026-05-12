@@ -24,6 +24,9 @@ type BuildGenerateRequestDefaults = {
   defaultModel?: string;
 };
 
+/**
+ * buildGenerateRequest 的导出入口。
+ */
 export function buildGenerateRequest(
   prompt: string,
   options: RawGenerateOptions,

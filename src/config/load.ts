@@ -14,6 +14,9 @@ type LoadResolvedConfigOptions = {
   env?: Record<string, string | undefined>;
 };
 
+/**
+ * loadResolvedConfig 的导出入口。
+ */
 export async function loadResolvedConfig(
   options: LoadResolvedConfigOptions = {}
 ): Promise<ResolvedConfig> {

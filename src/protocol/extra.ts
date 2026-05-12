@@ -1,3 +1,6 @@
+/**
+ * RESERVED_EXTRA_KEYS 的导出入口。
+ */
 export const RESERVED_EXTRA_KEYS = [
   "prompt",
   "model",
@@ -19,6 +22,9 @@ export const RESERVED_EXTRA_KEYS = [
 
 const RESERVED_EXTRA_KEY_SET = new Set<string>(RESERVED_EXTRA_KEYS);
 
+/**
+ * parseExtraObject 的导出入口。
+ */
 export function parseExtraObject(value?: string): Record<string, unknown> | undefined {
   if (value === undefined) {
     return undefined;
@@ -36,6 +42,9 @@ export function parseExtraObject(value?: string): Record<string, unknown> | unde
   }
 }
 
+/**
+ * assertNoReservedExtraKeys 的导出入口。
+ */
 export function assertNoReservedExtraKeys(extra?: Record<string, unknown>): void {
   if (!extra) {
     return;

@@ -10,6 +10,9 @@ import type {
 } from "../types.js";
 
 const OPENAI_IMAGES_GENERATIONS_PATH = "/images/generations";
+/**
+ * openaiProviderPlugin 的导出入口。
+ */
 export const openaiProviderPlugin: ProviderPlugin = {
   providerId: "openai",
   aliases: ["chatgpt-image"],
@@ -117,6 +120,7 @@ export const openaiProviderPlugin: ProviderPlugin = {
 
 export default openaiProviderPlugin;
 
+/** 规范化 OpenAI base URL，确保末尾包含斜杠。 */
 function normalizeBaseUrl(baseUrl: string): string {
   const trimmed = baseUrl.trim();
   return trimmed.endsWith("/") ? trimmed : `${trimmed}/`;
@@ -149,6 +153,7 @@ function getProviderExtra(
   return extra ? extra[key] : undefined;
 }
 
+/** 解析 OpenAI JSON 响应；空响应返回 undefined。 */
 function parseJsonBody(bodyText: string): Record<string, unknown> | undefined {
   if (!bodyText.trim()) {
     return undefined;

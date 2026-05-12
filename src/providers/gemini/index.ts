@@ -13,6 +13,7 @@ import type {
   ProviderPlugin
 } from "../types.js";
 
+/** Gemini API 默认基地址。 */
 const DEFAULT_BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
 const SYNTHID_WARNING = "Gemini-generated images are SynthID watermarked.";
 
@@ -36,6 +37,9 @@ type GeminiResponse = {
   }>;
 };
 
+/**
+ * geminiProvider 的导出入口。
+ */
 export const geminiProvider: ProviderPlugin = {
   providerId: "gemini",
   aliases: ["gemini", "nano-banana"],
@@ -113,6 +117,7 @@ export const geminiProvider: ProviderPlugin = {
 
 export default geminiProvider;
 
+/** 将标准化请求映射为 Gemini generateContent 请求。 */
 function buildGeminiGenerateRequest(input: ProviderGenerateContext): CurlRequest {
   const baseUrl = normalizeBaseUrl(input.providerConfig.apiBaseUrl);
   const modelId = encodeURIComponent(input.request.model.modelId);
@@ -184,6 +189,7 @@ function normalizeBaseUrl(value: string): string {
   return trimmed.endsWith("/") ? trimmed.slice(0, -1) : trimmed || DEFAULT_BASE_URL;
 }
 
+/** 解析 Gemini JSON 响应体。 */
 function parseJsonResponse(bodyText: string): GeminiResponse {
   try {
     return JSON.parse(bodyText) as GeminiResponse;

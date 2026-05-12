@@ -1,5 +1,8 @@
 import type { CanonicalProviderId, ModelRef } from "./types.js";
 
+/**
+ * CANONICAL_PROVIDER_IDS 的导出入口。
+ */
 export const CANONICAL_PROVIDER_IDS: CanonicalProviderId[] = [
   "openai",
   "openrouter",
@@ -25,6 +28,9 @@ const PROVIDER_ALIAS_MAP: Record<string, CanonicalProviderId> = {
 
 const CUSTOM_PROVIDER_PATTERN = /^[a-z0-9][a-z0-9_-]*$/i;
 
+/**
+ * resolveProviderAlias 的导出入口。
+ */
 export function resolveProviderAlias(value: string): string {
   const normalized = value.trim().toLowerCase();
   const providerId = PROVIDER_ALIAS_MAP[normalized];
@@ -41,6 +47,9 @@ export function resolveProviderAlias(value: string): string {
   );
 }
 
+/**
+ * parseModelRef 的导出入口。
+ */
 export function parseModelRef(value: string): ModelRef {
   const trimmed = value.trim();
   const slashIndex = trimmed.indexOf("/");

@@ -23,6 +23,9 @@ export type OutputManifest = {
   manifestPath: string;
 };
 
+/**
+ * writeGenerateArtifacts 的导出入口。
+ */
 export async function writeGenerateArtifacts(
   options: WriteGenerateArtifactsOptions
 ): Promise<OutputManifest> {

@@ -2,6 +2,9 @@ import path from "node:path";
 
 import type { ImageConfigPaths } from "./types.js";
 
+/**
+ * getImageConfigPaths 的导出入口。
+ */
 export function getImageConfigPaths(homeDir: string): ImageConfigPaths {
   const configDir = path.join(homeDir, ".image");
   return {

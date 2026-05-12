@@ -7,6 +7,7 @@ import type { FailureClassification, GenerateResult, ProviderPlugin } from "../p
 import type { CurlExecutionResult } from "../transport/curl.js";
 import type { PluginAction, ProviderPluginManifest } from "./types.js";
 
+/** Loads provider plugin manifests from the user's image config directory. */
 export function loadPluginManifests(homeDir: string = os.homedir()): ProviderPluginManifest[] {
   const pluginsDir = path.join(homeDir, ".image", "plugins");
   if (!existsSync(pluginsDir)) {
@@ -31,6 +32,7 @@ export function loadPluginManifests(homeDir: string = os.homedir()): ProviderPlu
     });
 }
 
+/** Creates a provider adapter backed by the plugin manifest entrypoint. */
 export function createPluginProvider(
   manifest: ProviderPluginManifest
 ): ProviderPlugin {
@@ -67,6 +69,7 @@ export function createPluginProvider(
   };
 }
 
+/** Finds and instantiates a configured plugin provider by provider id. */
 export function findPluginProvider(
   providerId: string,
   homeDir?: string
@@ -141,6 +144,7 @@ async function runProcess(
   });
 }
 
+/** Creates a fallback classification for plugin providers without synchronous failure handling. */
 export function makeAsyncPluginFailureClassification(providerId: string): FailureClassification {
   return {
     kind: "unknown",

@@ -34,6 +34,9 @@ const CAPABILITIES: ProviderCapabilities = {
   transparentOutput: false
 };
 
+/**
+ * minimaxProviderPlugin 的导出入口。
+ */
 export const minimaxProviderPlugin: ProviderPlugin = {
   providerId: "minimax",
   aliases: ["minimax", "minimax-image"],
@@ -118,6 +121,9 @@ export const minimaxProviderPlugin: ProviderPlugin = {
   }
 };
 
+/**
+ * buildGenerateRequest 的导出入口。
+ */
 export function buildGenerateRequest(input: ProviderGenerateContext): CurlRequest {
   const baseUrl = input.providerConfig.apiBaseUrl || MINIMAX_API_BASE_URL;
   const payload = buildRequestPayload(input.request, input.preparedImages);
@@ -133,6 +139,9 @@ export function buildGenerateRequest(input: ProviderGenerateContext): CurlReques
   };
 }
 
+/**
+ * buildRequestPayload 的导出入口。
+ */
 export function buildRequestPayload(
   request: GenerateRequest,
   preparedImages: PreparedImageInput[]
@@ -173,6 +182,9 @@ export function buildRequestPayload(
   };
 }
 
+/**
+ * buildSubjectReference 的导出入口。
+ */
 export function buildSubjectReference(preparedImages: PreparedImageInput[]): Array<{
   type: "character";
   image_file: string;
@@ -186,6 +198,9 @@ export function buildSubjectReference(preparedImages: PreparedImageInput[]): Arr
   }));
 }
 
+/**
+ * parseGenerateResultImages 的导出入口。
+ */
 export function parseGenerateResultImages(
   body: unknown,
   request: GenerateRequest
@@ -213,6 +228,9 @@ export function parseGenerateResultImages(
   return [];
 }
 
+/**
+ * parseImages 的导出入口。
+ */
 export function parseImages(
   body: unknown,
   request: GenerateRequest,

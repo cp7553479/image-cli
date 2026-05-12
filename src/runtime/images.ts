@@ -15,6 +15,9 @@ const MIME_TYPE_BY_EXTENSION: Record<string, string> = {
   ".heif": "image/heif"
 };
 
+/**
+ * prepareImageInputs 的导出入口。
+ */
 export async function prepareImageInputs(
   inputs: string[]
 ): Promise<PreparedImageInput[]> {
