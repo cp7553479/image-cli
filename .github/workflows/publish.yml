@@ -44,6 +44,5 @@ jobs:
 
       - name: Publish
         run: npm publish --access public --provenance
-        env:
-          # No token needed — npm authenticates this run via OIDC.
-          NODE_AUTH_TOKEN: ""
+        # No token needed — npm authenticates this run via OIDC.
+        # Intentionally NOT setting NODE_AUTH_TOKEN, which would override OIDC.
