@@ -1,8 +1,10 @@
 name: Publish to npm
 
 # Tokenless, OTP-less publishing via npm Trusted Publishing (OIDC).
-# Configure the trusted publisher on npmjs.com for @cp7553479/image-cli
-# with Workflow filename = publish.yml, then push a tag like v0.1.2 to release.
+# Configure the trusted publisher on npmjs.com for @cp7553479/image-cli:
+#   Repository = image-cli, Workflow filename = publish.yml,
+#   Environment name = (leave blank).
+# Then push a tag like v0.1.2 to release.
 
 on:
   push:
@@ -22,9 +24,9 @@ jobs:
   publish:
     name: Build, verify & publish
     runs-on: ubuntu-latest
-    # Must match the trusted publisher's "Environment name" if you set one.
-    # Leave as-is if you left Environment name empty on npm.
-    environment: npm
+    # No `environment:` here — keep it in sync with the trusted publisher
+    # config on npm (Environment name left blank). Matching is simpler and
+    # avoids E404 from a missing-environment mismatch on tag pushes.
 
     steps:
       - name: Checkout
