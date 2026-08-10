@@ -1,5 +1,6 @@
+import { existsSync } from "node:fs";
 import { parseModelRef } from "./model-ref.js";
-import type { GenerateRequest } from "./request.js";
+import type { GenerateRequest, ImageInput, ImageInputFidelity } from "./request.js";
 
 type RawGenerateOptions = {
   model?: string;
@@ -18,6 +19,9 @@ type RawGenerateOptions = {
   extra?: string;
   outputDir?: string;
   json?: boolean;
+  reference_image?: string[] | string;
+  mask?: string;
+  input_fidelity?: string;
 };
 
 type BuildGenerateRequestDefaults = {
@@ -40,7 +44,10 @@ const RESERVED_EXTRA_KEYS = new Set([
   "style",
   "user",
   "outputDir",
-  "json"
+  "json",
+  "reference_image",
+  "mask",
+  "input_fidelity"
 ]);
 
 /**
@@ -78,7 +85,10 @@ export function buildGenerateRequest(
     user: parseOptionalNonBlank(options.user, "--user"),
     extra: parseExtra(options.extra),
     outputDir: options.outputDir,
-    json: Boolean(options.json)
+    json: Boolean(options.json),
+    reference_images: parseReferenceImages(options.reference_image),
+    mask: parseImageInput(options.mask, "--mask"),
+    input_fidelity: parseInputFidelity(options.input_fidelity)
   };
 }
 
@@ -229,6 +239,55 @@ function parseExtra(value: string | undefined): Record<string, unknown> | undefi
   }
 
   return extra;
+}
+
+/**
+ * 把单个图片输入值解析为 ImageInput：http(s) URL → {url}，否则视为本地路径 → {file}。
+ */
+function parseImageInput(value: string | undefined, flagName: string): ImageInput | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    throw new Error(`${flagName} must not be empty.`);
+  }
+  if (/^https?:\/\//i.test(trimmed)) {
+    return { url: trimmed };
+  }
+  if (!existsSync(trimmed)) {
+    throw new Error(`${flagName} file does not exist: ${trimmed}`);
+  }
+  return { file: trimmed };
+}
+
+function parseReferenceImages(
+  value: string[] | string | undefined
+): ImageInput[] | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  const items = Array.isArray(value) ? value : [value];
+  const parsed: ImageInput[] = [];
+  for (const item of items) {
+    const input = parseImageInput(item, "--reference-image");
+    if (input) {
+      parsed.push(input);
+    }
+  }
+  return parsed.length > 0 ? parsed : undefined;
+}
+
+function parseInputFidelity(
+  value: string | undefined
+): ImageInputFidelity | undefined {
+  if (!value) {
+    return undefined;
+  }
+  if (value !== "low" && value !== "high") {
+    throw new Error(`Unsupported --input-fidelity "${value}".`);
+  }
+  return value;
 }
 
 function toErrorMessage(error: unknown): string {

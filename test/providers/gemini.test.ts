@@ -1,7 +1,14 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 
 import { geminiProvider } from "../../src/providers/gemini/index.js";
 import type { ProviderGenerateContext } from "../../src/providers/types.js";
+
+vi.mock("../../src/providers/image-input.js", () => ({
+  resolveImages: vi.fn(async (inputs: unknown[]) =>
+    inputs.map((_, i) => ({ base64: `base64-${i}`, mimeType: "image/png" }))
+  ),
+  resolveImage: vi.fn(async () => ({ base64: "mask-base64", mimeType: "image/png" }))
+}));
 
 function makeContext(
   overrides: Partial<ProviderGenerateContext> = {}
@@ -216,6 +223,29 @@ describe("gemini provider", () => {
     ).toEqual({
       kind: "retryable-transport",
       reason: "Gemini returned HTTP 503."
+    });
+  });
+
+  test("appends reference images as inlineData parts", async () => {
+    const operation = await geminiProvider.buildGenerateOperation(
+      makeContext({
+        request: {
+          prompt: "edit this scene",
+          model: {
+            providerId: "gemini",
+            providerAlias: "nano-banana",
+            modelId: "gemini-3.1-flash-image-preview"
+          },
+          reference_images: [{ url: "https://example.com/ref.png" }]
+        }
+      })
+    );
+
+    const json = operation.request.json as { contents: Array<{ parts: Array<Record<string, unknown>> }> };
+    const parts = json.contents[0].parts;
+    expect(parts[0]).toEqual({ text: "edit this scene" });
+    expect(parts[1]).toEqual({
+      inlineData: { mimeType: "image/png", data: "base64-0" }
     });
   });
 });

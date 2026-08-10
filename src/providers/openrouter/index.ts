@@ -19,6 +19,7 @@ import {
   assertSuccessfulResponse,
   parseJsonBody as parseProviderJsonBody
 } from "../response.js";
+import { resolveImageToDataUrl } from "../image-input.js";
 
 const DEFAULT_BASE_URL = "https://openrouter.ai/api/v1";
 const CHAT_COMPLETIONS_PATH = "/chat/completions";
@@ -44,7 +45,7 @@ export const openrouterProviderPlugin: ProviderPlugin = {
   aliases: getBuiltInProviderAliases("openrouter"),
   capabilities: {
     generate: true,
-    edit: false,
+    edit: true,
     asyncTasks: false,
     streaming: true,
     background: false,
@@ -69,7 +70,7 @@ export const openrouterProviderPlugin: ProviderPlugin = {
           messages: [
             {
               role: "user",
-              content: input.request.prompt
+              content: await buildMessageContent(input.request)
             }
           ],
           modalities: ["image", "text"],
@@ -136,6 +137,28 @@ function normalizeBaseUrl(value: string): string {
     return DEFAULT_BASE_URL;
   }
   return trimmed.endsWith("/") ? trimmed.slice(0, -1) : trimmed;
+}
+
+/**
+ * 构造 chat completions 的 message content：
+ * 有参考图时用多模态数组（text + image_url），无参考图时用纯字符串以保持兼容。
+ */
+async function buildMessageContent(
+  request: GenerateRequest
+): Promise<string | Array<Record<string, unknown>>> {
+  const referenceImages = request.reference_images;
+  if (!referenceImages || referenceImages.length === 0) {
+    return request.prompt;
+  }
+
+  const dataUrls = await Promise.all(
+    referenceImages.map((image) => resolveImageToDataUrl(image))
+  );
+  const content: Array<Record<string, unknown>> = [{ type: "text", text: request.prompt }];
+  for (const dataUrl of dataUrls) {
+    content.push({ type: "image_url", image_url: { url: dataUrl } });
+  }
+  return content;
 }
 
 function buildImageConfig(request: GenerateRequest): Record<string, unknown> | undefined {

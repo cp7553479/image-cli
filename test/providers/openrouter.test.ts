@@ -1,7 +1,13 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 
 import { openrouterProviderPlugin } from "../../src/providers/openrouter/index.js";
 import type { ProviderGenerateContext } from "../../src/providers/types.js";
+
+vi.mock("../../src/providers/image-input.js", () => ({
+  resolveImageToDataUrl: vi.fn(async (input: { url?: string; file?: string }) =>
+    `data:image/png;base64,openrouter-${input.url ?? input.file}`
+  )
+}));
 
 describe("openrouter provider", () => {
   test("builds chat completions image generation requests", async () => {
@@ -117,6 +123,35 @@ describe("openrouter provider", () => {
     ).rejects.toThrow(
       /OpenRouter request failed with HTTP 402: insufficient_credits: Insufficient credits/
     );
+  });
+
+  test("builds multimodal content array when reference images are provided", async () => {
+    const context = makeContext({
+      prompt: "restyle this image",
+      reference_images: [{ url: "https://example.com/ref.png" }]
+    });
+
+    const operation = await openrouterProviderPlugin.buildGenerateOperation(context);
+
+    const json = operation.request.json as { messages: Array<{ content: Array<Record<string, unknown>> }> };
+    const content = json.messages[0].content;
+    expect(Array.isArray(content)).toBe(true);
+    expect(content[0]).toEqual({ type: "text", text: "restyle this image" });
+    expect(content[1]).toEqual({
+      type: "image_url",
+      image_url: { url: "data:image/png;base64,openrouter-https://example.com/ref.png" }
+    });
+  });
+
+  test("keeps plain string content when no reference images are provided", async () => {
+    const context = makeContext({
+      prompt: "plain text prompt"
+    });
+
+    const operation = await openrouterProviderPlugin.buildGenerateOperation(context);
+
+    const json = operation.request.json as { messages: Array<{ content: unknown }> };
+    expect(json.messages[0].content).toBe("plain text prompt");
   });
 });
 

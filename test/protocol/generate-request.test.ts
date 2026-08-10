@@ -1,4 +1,7 @@
 import { describe, expect, test } from "vitest";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import { buildGenerateRequest } from "../../src/protocol/generate-request.js";
 
@@ -145,5 +148,98 @@ describe("generate request building", () => {
         extra: "{bad"
       })
     ).toThrow(/valid JSON object/i);
+  });
+
+  test("parses reference image URLs and local files", () => {
+    const tmpDir = mkdtempSync(join(tmpdir(), "image-cli-test-"));
+    const localPng = join(tmpDir, "ref.png");
+    writeFileSync(localPng, Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+
+    const request = buildGenerateRequest("edit this", {
+      model: "openai/gpt-image-1.5",
+      reference_image: [
+        "https://example.com/ref.png",
+        localPng
+      ]
+    });
+
+    expect(request.reference_images).toEqual([
+      { url: "https://example.com/ref.png" },
+      { file: localPng }
+    ]);
+  });
+
+  test("parses a single reference image string into an array", () => {
+    const request = buildGenerateRequest("edit this", {
+      model: "openai/gpt-image-1.5",
+      reference_image: "https://example.com/ref.png"
+    });
+
+    expect(request.reference_images).toEqual([{ url: "https://example.com/ref.png" }]);
+  });
+
+  test("parses mask as URL or local file", () => {
+    const tmpDir = mkdtempSync(join(tmpdir(), "image-cli-test-"));
+    const localMask = join(tmpDir, "mask.png");
+    writeFileSync(localMask, Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+
+    const urlRequest = buildGenerateRequest("edit", {
+      model: "openai/gpt-image-1.5",
+      mask: "https://example.com/mask.png"
+    });
+    expect(urlRequest.mask).toEqual({ url: "https://example.com/mask.png" });
+
+    const fileRequest = buildGenerateRequest("edit", {
+      model: "openai/gpt-image-1.5",
+      mask: localMask
+    });
+    expect(fileRequest.mask).toEqual({ file: localMask });
+  });
+
+  test("rejects mask files that do not exist", () => {
+    expect(() =>
+      buildGenerateRequest("edit", {
+        model: "openai/gpt-image-1.5",
+        mask: "/nonexistent/path/mask.png"
+      })
+    ).toThrow(/--mask/i);
+  });
+
+  test("parses input fidelity enum", () => {
+    const request = buildGenerateRequest("edit", {
+      model: "openai/gpt-image-1.5",
+      input_fidelity: "high"
+    });
+    expect(request.input_fidelity).toBe("high");
+
+    expect(() =>
+      buildGenerateRequest("edit", {
+        model: "openai/gpt-image-1.5",
+        input_fidelity: "medium"
+      })
+    ).toThrow(/--input-fidelity/i);
+  });
+
+  test("rejects reference_image, mask, and input_fidelity in extra", () => {
+    expect(() =>
+      buildGenerateRequest("prompt", {
+        model: "openai/gpt-image-1.5",
+        extra: '{"reference_image":"https://example.com/a.png"}'
+      })
+    ).toThrow(/must not override/i);
+
+    expect(() =>
+      buildGenerateRequest("prompt", {
+        model: "openai/gpt-image-1.5",
+        extra: '{"mask":"https://example.com/a.png"}'
+      })
+    ).toThrow(/must not override/i);
+
+    expect(() =>
+      buildGenerateRequest("prompt", {
+        model: "openai/gpt-image-1.5",
+        extra: '{"input_fidelity":"high"}'
+      })
+    ).toThrow(/must not override/i);
   });
 });

@@ -2,6 +2,10 @@ This module owns Volcengine Seedream mapping.
 
 - Map OpenAI-compatible generation fields to Seedream request fields.
 - Keep provider-native sequential generation derived from `n`.
+- Reference images (image-to-image / multi-image fusion) are set on the
+  `image` body field of `images/generations`: a single data URL string for one
+  image, or an array of data URL strings for multiple. The Ark API also
+  accepts raw URLs, but the CLI normalizes to data URLs for consistency.
 - Test generation mapping, response parsing, and retryable auth/quota failures.
 
 ## Official docs

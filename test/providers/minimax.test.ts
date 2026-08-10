@@ -1,8 +1,14 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 
 import { minimaxProviderPlugin } from "../../src/providers/minimax/index.js";
 import type { GenerateRequest } from "../../src/protocol/request.js";
 import type { ProviderGenerateContext } from "../../src/providers/types.js";
+
+vi.mock("../../src/providers/image-input.js", () => ({
+  resolveImageToDataUrl: vi.fn(async (input: { url?: string; file?: string }) =>
+    `data:image/png;base64,minimax-${input.url ?? input.file}`
+  )
+}));
 
 function makeContext(overrides: Partial<ProviderGenerateContext> = {}): ProviderGenerateContext {
   const request: GenerateRequest = {
@@ -227,5 +233,26 @@ describe("MiniMax provider", () => {
     ).rejects.toThrow(
       /MiniMax request failed with HTTP 400: 1002: invalid parameter/
     );
+  });
+
+  test("maps reference images to subject_reference entries", async () => {
+    const operation = await minimaxProviderPlugin.buildGenerateOperation(
+      makeContext({
+        request: {
+          prompt: "A portrait of a fox in a blue jacket",
+          model: {
+            providerId: "minimax",
+            providerAlias: "minimax",
+            modelId: "image-01"
+          },
+          reference_images: [{ url: "https://example.com/character.jpg" }]
+        }
+      })
+    );
+
+    const json = operation.request.json as Record<string, unknown>;
+    expect(json.subject_reference).toEqual([
+      { type: "character", image_file: "data:image/png;base64,minimax-https://example.com/character.jpg" }
+    ]);
   });
 });

@@ -56,10 +56,20 @@ image generate "prompt" \
   [--partial-images COUNT] \
   [--style vivid|natural] \
   [--user ID] \
+  [--reference-image PATH|URL] \
+  [--mask PATH|URL] \
+  [--input-fidelity low|high] \
   [--extra JSON_OBJECT] \
   [--output-dir PATH] \
   [--json]
 ```
+
+`--reference-image` may be repeated to pass multiple reference images. When one or
+more reference images are present, the request is an image-to-image / edit
+request; otherwise it is text-to-image. `--mask` marks the editable region
+(transparent pixels are editable) and is only meaningful for edit requests.
+`--input-fidelity` controls how closely the output follows the reference image
+for models that accept it.
 
 Config:
 
@@ -110,8 +120,18 @@ type GenerateRequest = {
   extra?: Record<string, unknown>;
   outputDir?: string;
   json?: boolean;
+  reference_images?: ImageInput[];
+  mask?: ImageInput;
+  input_fidelity?: "low" | "high";
 };
+
+type ImageInput = { url: string } | { file: string };
 ```
+
+`reference_images` carries one or more source images for image-to-image / edit
+requests. `mask` marks the editable region. `input_fidelity` controls fidelity
+to the reference image. All three are validated by the protocol layer but
+provider-specific support is decided by the provider response.
 
 `extra` carries provider-specific options outside the OpenAI-compatible image
 fields. It must be a JSON object and must not override standard fields.
@@ -185,10 +205,16 @@ type ProviderCapabilities = {
 
 v1 public command behavior:
 
-- `image generate` is text-to-image generation.
+- `image generate` serves both text-to-image and image-to-image (edit). The
+  presence of `reference_images` makes a request an edit request; the chosen
+  provider decides whether it routes to a generations or edits API surface.
 - Future commands may add other OpenAI-compatible image API surfaces as separate command contracts.
 - Capabilities are descriptive metadata. Generation does not block requests by provider capability before transport.
 - Unsupported option support must come from the provider response, not local provider-specific filtering.
+- Each provider adapts the unified `reference_images` / `mask` / `input_fidelity`
+  into its own native request shape. Provider-specific options beyond the
+  OpenAI-compatible fields are carried by `extra`, merged verbatim into the
+  provider request, and not locally validated.
 
 ## Provider Interface Layer
 

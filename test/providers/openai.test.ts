@@ -1,7 +1,17 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 
 import { openaiProviderPlugin } from "../../src/providers/openai/index.js";
 import type { ProviderGenerateContext } from "../../src/providers/types.js";
+
+vi.mock("../../src/providers/image-input.js", () => ({
+  resolveImageToFilePath: vi.fn(async (input: { url?: string; file?: string }) => ({
+    path: input.file ?? `/tmp/fake-${input.url}`,
+    mimeType: "image/png",
+    cleanup: async () => {
+      // 测试中不真正清理
+    }
+  }))
+}));
 
 describe("openai provider", () => {
   test("maps generate requests to the images generations endpoint", async () => {
@@ -52,6 +62,49 @@ describe("openai provider", () => {
       timeoutMs: 120000,
       stream: true
     });
+  });
+
+  test("routes to images/edits endpoint with multipart form when reference images are provided", async () => {
+    const context = makeContext({
+      prompt: "add a hat to the cat",
+      reference_images: [{ url: "https://example.com/cat.png" }],
+      mask: { url: "https://example.com/mask.png" },
+      input_fidelity: "high",
+      size: "1024x1024",
+      n: 1
+    });
+
+    const operation = await openaiProviderPlugin.buildGenerateOperation(context);
+
+    expect(operation.request.method).toBe("POST");
+    expect(operation.request.url).toBe("https://api.openai.com/v1/images/edits");
+    expect(operation.request.headers).toEqual({ Authorization: "Bearer sk-test" });
+    expect(operation.request.json).toBeUndefined();
+    expect(operation.request.form).toEqual([
+      { name: "image", filePath: "/tmp/fake-https://example.com/cat.png", contentType: "image/png" },
+      { name: "mask", filePath: "/tmp/fake-https://example.com/mask.png", contentType: "image/png" },
+      { name: "model", value: "gpt-image-1" },
+      { name: "prompt", value: "add a hat to the cat" },
+      { name: "size", value: "1024x1024" },
+      { name: "n", value: "1" },
+      { name: "input_fidelity", value: "high" }
+    ]);
+  });
+
+  test("uses image[] field name when multiple reference images are provided", async () => {
+    const context = makeContext({
+      prompt: "fuse two styles",
+      reference_images: [
+        { url: "https://example.com/a.png" },
+        { url: "https://example.com/b.png" }
+      ]
+    });
+
+    const operation = await openaiProviderPlugin.buildGenerateOperation(context);
+
+    const form = operation.request.form ?? [];
+    const imageFields = form.filter((f) => f.name === "image[]");
+    expect(imageFields).toHaveLength(2);
   });
 
   test("parses base64 and url image results", async () => {

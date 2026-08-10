@@ -1,3 +1,4 @@
+import os from "node:os";
 import path from "node:path";
 
 import type { ImageConfigPaths } from "./types.js";
@@ -20,4 +21,12 @@ export function getImageConfigPaths(homeDir: string): ImageConfigPaths {
       path.join(homeDir, "antigravity", "skills", "image-cli")
     ]
   };
+}
+
+/**
+ * 返回统一的工作临时目录 ~/.image/.temp/。
+ * 下载的参考图等中间产物在用户未显式指定目录时统一存放于此。
+ */
+export function getImageTempDir(homeDir: string = os.homedir()): string {
+  return path.join(homeDir, ".image", ".temp");
 }

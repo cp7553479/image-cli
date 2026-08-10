@@ -1,5 +1,7 @@
 This module owns MiniMax image generation mapping.
 
+- Reference images (image-to-image) map to `subject_reference:
+  [{type:"character", image_file: dataURL}]` on `POST /v1/image_generation`.
 - Keep reference-image handling inside the provider mapping layer.
 - Respect MiniMax output format and URL-expiry semantics in parsed metadata.
 - Test request mapping, response parsing, and retryable credential failures.

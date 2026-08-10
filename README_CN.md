@@ -64,9 +64,16 @@ image generate "<prompt>" [flags]
 - `--partial-images <count>`
 - `--style <vivid|natural>`
 - `--user <id>`
+- `--reference-image <path|url>`（可重复；启用图生图 / 编辑）
+- `--mask <path|url>`（透明区域为可编辑区域）
+- `--input-fidelity <low|high>`（gpt-image 对参考图的保真度）
 - `--extra <json object>`
 - `--output-dir <path>`
 - `--json`
+
+`--reference-image` 启用图生图。可多次传入融合多张参考图。各 provider 会
+把参考图适配为自家原生 API；具体是否支持仍以远端返回为准。下载的参考图
+缓存到 `~/.image/.temp/`。
 
 `--extra` 用于传递 OpenAI-compatible 字段之外的 provider 私有参数。它必须是
 JSON object，且不能覆盖 `model`、`prompt`、`size`、`n`、`output_format`
@@ -85,6 +92,16 @@ image generate "Editorial portrait with dramatic rim light" \
   --quality high \
   --output-format png \
   --response-format b64_json
+```
+
+图生图示例：
+
+```bash
+image generate "add a knitted hat" \
+  --model openai/gpt-image-1.5 \
+  --reference-image ./portrait.png \
+  --mask ./mask.png \
+  --input-fidelity high
 ```
 
 `--model` 使用 `provider/modelid`。`provider` 用于本地路由，`modelid` 原样传给 provider。

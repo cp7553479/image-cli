@@ -97,6 +97,9 @@ class ImageCliProgram extends BaseCliProgram {
       partial_images: CLI_PARSE.stringValue(values["partial-images"]),
       style: CLI_PARSE.stringValue(values.style),
       user: CLI_PARSE.stringValue(values.user),
+      reference_image: CLI_PARSE.stringArrayValue(values["reference-image"]),
+      mask: CLI_PARSE.stringValue(values.mask),
+      input_fidelity: CLI_PARSE.stringValue(values["input-fidelity"]),
       extra: CLI_PARSE.stringValue(values.extra),
       outputDir: CLI_PARSE.stringValue(values["output-dir"]),
       json: Boolean(values.json)

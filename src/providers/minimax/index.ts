@@ -19,6 +19,7 @@ import {
   parseOpenAIImageSize
 } from "../openai-image-options.js";
 import { assertSuccessfulResponse } from "../response.js";
+import { resolveImageToDataUrl } from "../image-input.js";
 
 const MINIMAX_API_BASE_URL = "https://api.minimax.io/v1";
 const TEMPORARY_URL_WARNING =
@@ -29,7 +30,7 @@ const RETRYABLE_CREDENTIAL_CODES = new Set([401, 403, 429, 1004, 1008, 2049]);
 
 const CAPABILITIES: ProviderCapabilities = {
   generate: true,
-  edit: false,
+  edit: true,
   asyncTasks: false,
   streaming: false,
   background: false,
@@ -46,7 +47,7 @@ export const minimaxProviderPlugin: ProviderPlugin = {
   capabilities: CAPABILITIES,
   async buildGenerateOperation(input: ProviderGenerateContext): Promise<ProviderOperation> {
     return {
-      request: buildGenerateRequest(input)
+      request: await buildGenerateRequest(input)
     };
   },
   async parseGenerateResponse(
@@ -125,9 +126,11 @@ export const minimaxProviderPlugin: ProviderPlugin = {
 /**
  * buildGenerateRequest 的导出入口。
  */
-export function buildGenerateRequest(input: ProviderGenerateContext): CurlRequest {
+export async function buildGenerateRequest(
+  input: ProviderGenerateContext
+): Promise<CurlRequest> {
   const baseUrl = input.providerConfig.apiBaseUrl || MINIMAX_API_BASE_URL;
-  const payload = buildRequestPayload(input.request);
+  const payload = await buildRequestPayload(input.request);
 
   return {
     method: "POST",
@@ -143,9 +146,9 @@ export function buildGenerateRequest(input: ProviderGenerateContext): CurlReques
 /**
  * buildRequestPayload 的导出入口。
  */
-export function buildRequestPayload(
+export async function buildRequestPayload(
   request: GenerateRequest
-): Record<string, unknown> {
+): Promise<Record<string, unknown>> {
   const payload: Record<string, unknown> = {
     ...(request.extra ?? {}),
     ...collectOpenAIImageRequestFields(request, {
@@ -167,7 +170,23 @@ export function buildRequestPayload(
     payload.n = request.n;
   }
 
+  if (request.reference_images && request.reference_images.length > 0) {
+    payload.subject_reference = await buildSubjectReference(request.reference_images);
+  }
+
   return payload;
+}
+
+/**
+ * 参考图映射为 MiniMax 的 subject_reference（按图生图文档，type 固定 character，image_file 接受 URL 或 data URL）。
+ */
+async function buildSubjectReference(
+  referenceImages: NonNullable<GenerateRequest["reference_images"]>
+): Promise<Array<{ type: string; image_file: string }>> {
+  const dataUrls = await Promise.all(
+    referenceImages.map((image) => resolveImageToDataUrl(image))
+  );
+  return dataUrls.map((dataUrl) => ({ type: "character", image_file: dataUrl }));
 }
 
 /**

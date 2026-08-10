@@ -6,3 +6,4 @@ image-output/
 *.log
 tmp/
 *.tmp
+.zcode/

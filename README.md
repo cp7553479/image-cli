@@ -69,9 +69,17 @@ Supported flags:
 - `--partial-images <count>`
 - `--style <vivid|natural>`
 - `--user <id>`
+- `--reference-image <path|url>` (repeatable; enables image-to-image / edit)
+- `--mask <path|url>` (transparent areas are editable)
+- `--input-fidelity <low|high>` (gpt-image fidelity to the reference image)
 - `--extra <json object>`
 - `--output-dir <path>`
 - `--json`
+
+`--reference-image` enables image-to-image generation. Pass it multiple times
+to fuse several reference images. Each provider adapts the reference images to
+its native API; provider-specific support is still decided by the remote
+response. Downloaded reference images are cached under `~/.image/.temp/`.
 
 `--extra` is for provider-specific options beyond the OpenAI-compatible
 fields. It must be a JSON object and cannot override standard fields such as
@@ -90,6 +98,16 @@ image generate "Editorial portrait with dramatic rim light" \
   --quality high \
   --output-format png \
   --response-format b64_json
+```
+
+Image-to-image example:
+
+```bash
+image generate "add a knitted hat" \
+  --model openai/gpt-image-1.5 \
+  --reference-image ./portrait.png \
+  --mask ./mask.png \
+  --input-fidelity high
 ```
 
 `--model` uses `provider/modelid`. The provider segment is used for local

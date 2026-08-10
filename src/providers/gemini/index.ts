@@ -20,6 +20,7 @@ import {
   assertSuccessfulResponse,
   parseJsonBody as parseProviderJsonBody
 } from "../response.js";
+import { resolveImage, resolveImages } from "../image-input.js";
 
 /** Gemini API 默认基地址。 */
 const DEFAULT_BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
@@ -54,7 +55,7 @@ export const geminiProvider: ProviderPlugin = {
   aliases: getBuiltInProviderAliases("gemini"),
   capabilities: {
     generate: true,
-    edit: false,
+    edit: true,
     asyncTasks: true,
     streaming: false,
     background: false,
@@ -62,7 +63,7 @@ export const geminiProvider: ProviderPlugin = {
     transparentOutput: false
   },
   async buildGenerateOperation(input: ProviderGenerateContext): Promise<ProviderOperation> {
-    const request = buildGeminiGenerateRequest(input);
+    const request = await buildGeminiGenerateRequest(input);
     return {
       request
     };
@@ -127,10 +128,10 @@ export const geminiProvider: ProviderPlugin = {
 export default geminiProvider;
 
 /** 将标准化请求映射为 Gemini generateContent 请求。 */
-function buildGeminiGenerateRequest(input: ProviderGenerateContext): CurlRequest {
+async function buildGeminiGenerateRequest(input: ProviderGenerateContext): Promise<CurlRequest> {
   const baseUrl = normalizeBaseUrl(input.providerConfig.apiBaseUrl);
   const modelId = encodeURIComponent(input.request.model.modelId);
-  const parts = buildGeminiParts(input.request);
+  const parts = await buildGeminiParts(input.request);
 
   return {
     method: "POST",
@@ -152,12 +153,32 @@ function buildGeminiGenerateRequest(input: ProviderGenerateContext): CurlRequest
   };
 }
 
-function buildGeminiParts(request: GenerateRequest): Array<Record<string, unknown>> {
-  return [
-    {
-      text: request.prompt
+async function buildGeminiParts(
+  request: GenerateRequest
+): Promise<Array<Record<string, unknown>>> {
+  const parts: Array<Record<string, unknown>> = [{ text: request.prompt }];
+
+  if (request.mask) {
+    // Gemini 无原生蒙版概念，但允许参考图先于 mask 拼接。
+    const resolved = await resolveImage(request.mask);
+    parts.push({ inlineData: toInlineData(resolved) });
+  }
+
+  if (request.reference_images && request.reference_images.length > 0) {
+    const images = await resolveImages(request.reference_images);
+    for (const image of images) {
+      parts.push({ inlineData: toInlineData(image) });
     }
-  ];
+  }
+
+  return parts;
+}
+
+function toInlineData(image: { base64: string; mimeType: string }): {
+  mimeType: string;
+  data: string;
+} {
+  return { mimeType: image.mimeType, data: image.base64 };
 }
 
 function buildGenerationConfig(request: GenerateRequest): Record<string, unknown> {

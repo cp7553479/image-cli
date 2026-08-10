@@ -9,6 +9,7 @@ import type { CurlExecutionResult } from "../../transport/curl.js";
 import { getBuiltInProviderAliases } from "../identity.js";
 import { collectOpenAIImageRequestFields } from "../openai-image-options.js";
 import { assertSuccessfulResponse } from "../response.js";
+import { resolveImages } from "../image-input.js";
 
 const DEFAULT_BASE_URL = "https://ark.cn-beijing.volces.com/api/v3";
 const TEMPORARY_URL_WARNING = "Temporary URL; expires in 24 hours.";
@@ -21,7 +22,7 @@ export const seedreamProviderPlugin: ProviderPlugin = {
   aliases: getBuiltInProviderAliases("seedream"),
   capabilities: {
     generate: true,
-    edit: false,
+    edit: true,
     asyncTasks: false,
     streaming: true,
     background: false,
@@ -29,7 +30,7 @@ export const seedreamProviderPlugin: ProviderPlugin = {
     transparentOutput: false
   },
   async buildGenerateOperation(input: ProviderGenerateContext): Promise<ProviderOperation> {
-    const requestBody = buildRequestBody(input);
+    const requestBody = await buildRequestBody(input);
 
     return {
       request: {
@@ -106,7 +107,7 @@ export const seedreamProviderPlugin: ProviderPlugin = {
   }
 };
 
-function buildRequestBody(input: ProviderGenerateContext): Record<string, unknown> {
+async function buildRequestBody(input: ProviderGenerateContext): Promise<Record<string, unknown>> {
   const body: Record<string, unknown> = {
     watermark: false,
     ...(input.request.extra ?? {}),
@@ -128,7 +129,24 @@ function buildRequestBody(input: ProviderGenerateContext): Record<string, unknow
     };
   }
 
+  const referenceImages = input.request.reference_images;
+  if (referenceImages && referenceImages.length > 0) {
+    body.image = await resolveSeedreamReferenceImages(referenceImages);
+  }
+
   return body;
+}
+
+/**
+ * 火山方舟 image 字段接受 URL 或 base64；本地文件/远程 URL 统一解析。
+ * 多图融合传字符串数组，单图传字符串。
+ */
+async function resolveSeedreamReferenceImages(
+  referenceImages: NonNullable<ProviderGenerateContext["request"]["reference_images"]>
+): Promise<string | string[]> {
+  const images = await resolveImages(referenceImages);
+  const dataUrls = images.map((image) => `data:${image.mimeType};base64,${image.base64}`);
+  return dataUrls.length > 1 ? dataUrls : dataUrls[0];
 }
 
 function parsePayload(bodyText: string, tolerateInvalid = false): unknown {

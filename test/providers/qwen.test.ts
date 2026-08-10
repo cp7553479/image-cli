@@ -2,6 +2,12 @@ import { describe, expect, test, vi } from "vitest";
 
 import { qwenProvider } from "../../src/providers/qwen/index.js";
 
+vi.mock("../../src/providers/image-input.js", () => ({
+  resolveImageToDataUrl: vi.fn(async (input: { url?: string; file?: string }) =>
+    `data:image/png;base64,qwen-${input.url ?? input.file}`
+  )
+}));
+
 describe("qwen provider", () => {
   test("builds sync multimodal generation requests from OpenAI-compatible options", async () => {
     const operation = await qwenProvider.buildGenerateOperation({
@@ -292,6 +298,34 @@ describe("qwen provider", () => {
     ).rejects.toThrow(
       /Qwen request failed with HTTP 401: InvalidApiKey: Invalid API key/
     );
+  });
+
+  test("appends reference images to sync multimodal content", async () => {
+    const operation = await qwenProvider.buildGenerateOperation({
+      request: {
+        prompt: "keep the subject, change the background",
+        model: {
+          providerId: "qwen",
+          providerAlias: "qwen",
+          modelId: "qwen-vl-max"
+        },
+        reference_images: [{ url: "https://example.com/ref.png" }]
+      },
+      providerConfig: {
+        enabled: true,
+        apiBaseUrl: "https://dashscope.aliyuncs.com/api/v1",
+        timeoutMs: 30_000,
+        retryPolicy: { maxAttempts: 2 },
+        apiKey: "secret-key",
+        credentials: [{ envName: "DASHSCOPE_API_KEY", value: "secret-key" }]
+      },
+      credential: { envName: "DASHSCOPE_API_KEY", value: "secret-key" }
+    });
+
+    const json = operation.request.json as { input: { messages: Array<{ content: Array<Record<string, unknown>> }> } };
+    const content = json.input.messages[0].content;
+    expect(content[0]).toEqual({ text: "keep the subject, change the background" });
+    expect(content[1]).toEqual({ image: "data:image/png;base64,qwen-https://example.com/ref.png" });
   });
 });
 

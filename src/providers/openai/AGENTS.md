@@ -1,7 +1,12 @@
 This module owns OpenAI request/response mapping.
 
-- Map normalized generate fields to the OpenAI Images API only.
-- Keep edit capability internal for v1; do not expose a public edit command here.
+- Map normalized generate fields to the OpenAI Images API.
+- Text-to-image (no `reference_images`) routes to `POST /images/generations` with a JSON body.
+- Image-to-image (one or more `reference_images`) routes to `POST /images/edits`
+  with multipart/form-data: `image` (or `image[]` for multiple) carries the
+  reference images as file uploads, `mask` carries the edit mask, and scalar
+  fields (`model`, `prompt`, `size`, `n`, `input_fidelity`, ...) become form
+  text fields.
 - Test request building, response parsing, and auth/rate-limit failure classification.
 
 ## Official docs

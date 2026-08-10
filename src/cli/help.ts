@@ -44,6 +44,9 @@ Options:
   --partial-images <count>           partial streamed image count
   --style <vivid|natural>            image style
   --user <id>                        end-user identifier
+  --reference-image <path|url>       reference image; repeat to pass multiple (image-to-image)
+  --mask <path|url>                  edit mask (PNG, transparent areas are editable)
+  --input-fidelity <low|high>        fidelity to reference image (gpt-image)
   --extra <json>                     provider-specific JSON options; cannot override standard fields
   --output-dir <path>                directory for saved outputs; default is ./image-output/<timestamp>/
   --json                             print JSON manifest
@@ -162,6 +165,9 @@ export const CLI_OPTIONS = {
     "partial-images": { type: "string" },
     style: { type: "string" },
     user: { type: "string" },
+    "reference-image": { type: "string", multiple: true },
+    mask: { type: "string" },
+    "input-fidelity": { type: "string" },
     extra: { type: "string" },
     "output-dir": { type: "string" },
     json: { type: "boolean" },

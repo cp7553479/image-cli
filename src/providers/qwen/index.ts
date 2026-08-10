@@ -21,6 +21,7 @@ import {
   assertSuccessfulResponse,
   parseJsonBody as parseProviderJsonBody
 } from "../response.js";
+import { resolveImageToDataUrl } from "../image-input.js";
 
 /** Qwen API 默认基地址。用于拼接同步/异步端点。 */
 const DEFAULT_BASE_URL = "https://dashscope.aliyuncs.com/api/v1";
@@ -61,7 +62,7 @@ export const qwenProvider: ProviderPlugin = {
   aliases: getBuiltInProviderAliases("qwen"),
   capabilities: {
     generate: true,
-    edit: false,
+    edit: true,
     asyncTasks: true,
     streaming: false,
     background: false,
@@ -73,7 +74,7 @@ export const qwenProvider: ProviderPlugin = {
     if (useAsync) {
       return buildAsyncOperation(input);
     }
-    return buildSyncOperation(input);
+    return await buildSyncOperation(input);
   },
   async parseGenerateResponse(
     result: CurlExecutionResult,
@@ -124,7 +125,7 @@ export const qwenProvider: ProviderPlugin = {
   }
 };
 
-function buildSyncOperation(input: ProviderGenerateContext): ProviderOperation {
+async function buildSyncOperation(input: ProviderGenerateContext): Promise<ProviderOperation> {
   return {
     request: {
       method: "POST",
@@ -136,7 +137,7 @@ function buildSyncOperation(input: ProviderGenerateContext): ProviderOperation {
           messages: [
             {
               role: "user",
-              content: buildSyncContent(input.request)
+              content: await buildSyncContent(input.request)
             }
           ]
         },
@@ -236,8 +237,21 @@ function buildAuthHeaders(apiKey: string): Record<string, string> {
   };
 }
 
-function buildSyncContent(request: GenerateRequest): Array<Record<string, unknown>> {
-  return [{ text: request.prompt }];
+async function buildSyncContent(
+  request: GenerateRequest
+): Promise<Array<Record<string, unknown>>> {
+  const content: Array<Record<string, unknown>> = [{ text: request.prompt }];
+
+  if (request.reference_images && request.reference_images.length > 0) {
+    const dataUrls = await Promise.all(
+      request.reference_images.map((image) => resolveImageToDataUrl(image))
+    );
+    for (const dataUrl of dataUrls) {
+      content.push({ image: dataUrl });
+    }
+  }
+
+  return content;
 }
 
 function buildParameters(request: GenerateRequest): Record<string, unknown> {

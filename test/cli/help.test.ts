@@ -30,6 +30,9 @@ describe("CLI help", () => {
     expect(generateHelp).toContain("--output-compression <0-100>");
     expect(generateHelp).toContain("--response-format <url|b64_json>");
     expect(generateHelp).toContain("--extra <json>");
+    expect(generateHelp).toContain("--reference-image <path|url>");
+    expect(generateHelp).toContain("--mask <path|url>");
+    expect(generateHelp).toContain("--input-fidelity <low|high>");
     expect(generateHelp).toContain("print JSON manifest");
     expect(generateHelp).toContain("Usage: image generate <prompt>");
     expect(generateHelp).toContain("config.defaultModel");

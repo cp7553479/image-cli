@@ -1,4 +1,4 @@
-import type { CurlExecutionResult } from "../../transport/curl.js";
+import type { CurlExecutionResult, CurlFormField } from "../../transport/curl.js";
 import type {
   FailureClassification,
   GenerateResult,
@@ -15,8 +15,8 @@ import {
   parseJsonBody as parseProviderJsonBody,
   parseSseJsonData
 } from "../response.js";
+import { resolveImageToFilePath } from "../image-input.js";
 
-const OPENAI_IMAGES_GENERATIONS_PATH = "/images/generations";
 /**
  * openaiProviderPlugin 的导出入口。
  */
@@ -25,7 +25,7 @@ export const openaiProviderPlugin: ProviderPlugin = {
   aliases: getBuiltInProviderAliases("openai"),
   capabilities: {
     generate: true,
-    edit: false,
+    edit: true,
     asyncTasks: false,
     streaming: true,
     background: true,
@@ -34,25 +34,13 @@ export const openaiProviderPlugin: ProviderPlugin = {
   },
   async buildGenerateOperation(input: ProviderGenerateContext): Promise<ProviderOperation> {
     const baseUrl = normalizeBaseUrl(input.providerConfig.apiBaseUrl);
-    const requestBody = {
-      ...(input.request.extra ?? {}),
-      ...collectOpenAIImageRequestFields(input.request, {
-        includeModelAndPrompt: true
-      })
-    };
+    const referenceImages = input.request.reference_images ?? [];
 
-    return {
-      request: {
-        method: "POST",
-        url: new URL("images/generations", baseUrl).toString(),
-        headers: {
-          Authorization: `Bearer ${input.credential.value}`
-        },
-        json: requestBody,
-        timeoutMs: input.providerConfig.timeoutMs,
-        stream: input.request.stream
-      }
-    };
+    if (referenceImages.length > 0) {
+      return buildEditOperation(input, baseUrl);
+    }
+
+    return buildGenerationOperation(input, baseUrl);
   },
   async parseGenerateResponse(
     result: CurlExecutionResult,
@@ -114,6 +102,96 @@ export const openaiProviderPlugin: ProviderPlugin = {
 };
 
 export default openaiProviderPlugin;
+
+async function buildGenerationOperation(
+  input: ProviderGenerateContext,
+  baseUrl: string
+): Promise<ProviderOperation> {
+  const requestBody = {
+    ...(input.request.extra ?? {}),
+    ...collectOpenAIImageRequestFields(input.request, {
+      includeModelAndPrompt: true
+    })
+  };
+
+  return {
+    request: {
+      method: "POST",
+      url: new URL("images/generations", baseUrl).toString(),
+      headers: {
+        Authorization: `Bearer ${input.credential.value}`
+      },
+      json: requestBody,
+      timeoutMs: input.providerConfig.timeoutMs,
+      stream: input.request.stream
+    }
+  };
+}
+
+/**
+ * 图生图：走 /images/edits 端点，multipart/form-data。
+ * 参考图作为 image 字段（多张用 image[]），mask 作为独立字段，
+ * 其余 OpenAI 标量字段作为 form 文本字段。
+ */
+async function buildEditOperation(
+  input: ProviderGenerateContext,
+  baseUrl: string
+): Promise<ProviderOperation> {
+  const referenceImages = input.request.reference_images!;
+  const fields: CurlFormField[] = [];
+  const cleanups: Array<() => Promise<void>> = [];
+
+  try {
+    for (let index = 0; index < referenceImages.length; index++) {
+      const resolved = await resolveImageToFilePath(referenceImages[index]);
+      cleanups.push(resolved.cleanup);
+      fields.push({
+        name: referenceImages.length > 1 ? "image[]" : "image",
+        filePath: resolved.path,
+        contentType: resolved.mimeType
+      });
+    }
+
+    if (input.request.mask) {
+      const resolved = await resolveImageToFilePath(input.request.mask);
+      cleanups.push(resolved.cleanup);
+      fields.push({
+        name: "mask",
+        filePath: resolved.path,
+        contentType: resolved.mimeType
+      });
+    }
+
+    const scalarFields = collectOpenAIImageRequestFields(input.request, {
+      includeModelAndPrompt: true,
+      includeSize: true
+    });
+    if (input.request.input_fidelity) {
+      scalarFields.input_fidelity = input.request.input_fidelity;
+    }
+    Object.assign(scalarFields, input.request.extra ?? {});
+
+    for (const [key, value] of Object.entries(scalarFields)) {
+      fields.push({ name: key, value: String(value) });
+    }
+
+    return {
+      request: {
+        method: "POST",
+        url: new URL("images/edits", baseUrl).toString(),
+        headers: {
+          Authorization: `Bearer ${input.credential.value}`
+        },
+        form: fields,
+        timeoutMs: input.providerConfig.timeoutMs,
+        stream: input.request.stream
+      }
+    };
+  } catch (error) {
+    await Promise.allSettled(cleanups.map((cleanup) => cleanup()));
+    throw error;
+  }
+}
 
 /** 规范化 OpenAI base URL，确保末尾包含斜杠。 */
 function normalizeBaseUrl(baseUrl: string): string {

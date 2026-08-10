@@ -1,8 +1,14 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 
 import { seedreamProviderPlugin } from "../../src/providers/seedream/index.js";
 import type { ProviderGenerateContext } from "../../src/providers/types.js";
 import type { CurlExecutionResult } from "../../src/transport/curl.js";
+
+vi.mock("../../src/providers/image-input.js", () => ({
+  resolveImages: vi.fn(async (inputs: unknown[]) =>
+    inputs.map((_, i) => ({ base64: `base64-${i}`, mimeType: "image/png" }))
+  )
+}));
 
 describe("seedream provider", () => {
   test("defaults to watermark disabled and allows explicit watermark", async () => {
@@ -185,6 +191,38 @@ describe("seedream provider", () => {
     ).rejects.toThrow(
       /Seedream request failed with HTTP 429: rate_limit_exceeded: Too many requests/
     );
+  });
+
+  test("injects reference images into the image field as data URLs", async () => {
+    const operation = await seedreamProviderPlugin.buildGenerateOperation(
+      makeContext({
+        request: {
+          reference_images: [{ url: "https://example.com/ref.png" }]
+        }
+      })
+    );
+
+    const json = operation.request.json as Record<string, unknown>;
+    expect(json.image).toBe("data:image/png;base64,base64-0");
+  });
+
+  test("passes multiple reference images as an array", async () => {
+    const operation = await seedreamProviderPlugin.buildGenerateOperation(
+      makeContext({
+        request: {
+          reference_images: [
+            { url: "https://example.com/a.png" },
+            { url: "https://example.com/b.png" }
+          ]
+        }
+      })
+    );
+
+    const json = operation.request.json as Record<string, unknown>;
+    expect(json.image).toEqual([
+      "data:image/png;base64,base64-0",
+      "data:image/png;base64,base64-1"
+    ]);
   });
 });
 
