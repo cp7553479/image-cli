@@ -3,13 +3,22 @@ import type { CurlExecutionResult } from "../../transport/curl.js";
 import type {
   FailureClassification,
   GenerateResult,
-  PreparedImageInput,
   ProviderErrorContext,
   ProviderGenerateContext,
   ProviderImageResult,
   ProviderOperation,
   ProviderPlugin
 } from "../types.js";
+import { getBuiltInProviderAliases } from "../identity.js";
+import {
+  aspectRatioFromOpenAIImageSize,
+  collectOpenAIImageRequestFields,
+  openRouterImageSizeFromOpenAIImageSize
+} from "../openai-image-options.js";
+import {
+  assertSuccessfulResponse,
+  parseJsonBody as parseProviderJsonBody
+} from "../response.js";
 
 const DEFAULT_BASE_URL = "https://openrouter.ai/api/v1";
 const CHAT_COMPLETIONS_PATH = "/chat/completions";
@@ -32,15 +41,13 @@ type OpenRouterResponse = {
  */
 export const openrouterProviderPlugin: ProviderPlugin = {
   providerId: "openrouter",
-  aliases: ["openrouter", "openrouter-image"],
+  aliases: getBuiltInProviderAliases("openrouter"),
   capabilities: {
     generate: true,
-    edit: true,
-    inputImages: true,
+    edit: false,
     asyncTasks: false,
     streaming: true,
     background: false,
-    negativePrompt: false,
     multipleOutputs: true,
     transparentOutput: false
   },
@@ -54,16 +61,19 @@ export const openrouterProviderPlugin: ProviderPlugin = {
           "Content-Type": "application/json"
         },
         json: {
+          ...(input.request.extra ?? {}),
+          ...collectOpenAIImageRequestFields(input.request, {
+            includeSize: false
+          }),
           model: input.request.model.modelId,
           messages: [
             {
               role: "user",
-              content: buildContent(input.request, input.preparedImages)
+              content: input.request.prompt
             }
           ],
           modalities: ["image", "text"],
-          image_config: buildImageConfig(input.request),
-          ...(input.request.extra ?? {})
+          image_config: buildImageConfig(input.request)
         },
         timeoutMs: input.providerConfig.timeoutMs,
         stream: input.request.stream
@@ -74,7 +84,9 @@ export const openrouterProviderPlugin: ProviderPlugin = {
     result: CurlExecutionResult,
     input: ProviderGenerateContext
   ): Promise<GenerateResult> {
-    const payload = parseJsonResponse(result.bodyText);
+    const payload = parseJsonResponse(result.bodyText, result.statusCode >= 400);
+    assertSuccessfulResponse("OpenRouter", result, payload);
+
     const images = (payload.choices?.[0]?.message?.images ?? [])
       .map((image) => parseImageResult(image))
       .filter((image): image is ProviderImageResult => Boolean(image));
@@ -126,39 +138,16 @@ function normalizeBaseUrl(value: string): string {
   return trimmed.endsWith("/") ? trimmed.slice(0, -1) : trimmed;
 }
 
-function buildContent(
-  request: GenerateRequest,
-  preparedImages: PreparedImageInput[]
-): string | Array<Record<string, unknown>> {
-  if (preparedImages.length === 0) {
-    return request.prompt;
-  }
-
-  return [
-    {
-      type: "text",
-      text: request.prompt
-    },
-    ...preparedImages.map((image) => ({
-      type: "image_url",
-      image_url: {
-        url:
-          image.kind === "url"
-            ? image.url
-            : `data:${image.mimeType};base64,${image.base64Data}`
-      }
-    }))
-  ];
-}
-
 function buildImageConfig(request: GenerateRequest): Record<string, unknown> | undefined {
-  const imageConfig: Record<string, unknown> = {};
-  const aspectRatio = request.normalizedSize?.aspectRatio ?? request.aspectRatio;
+  const imageConfig: Record<string, unknown> = {
+    ...getRecord(request.extra?.image_config)
+  };
+  const aspectRatio = aspectRatioFromOpenAIImageSize(request.size);
   if (aspectRatio) {
     imageConfig.aspect_ratio = aspectRatio;
   }
 
-  const imageSize = resolveImageSize(request);
+  const imageSize = openRouterImageSizeFromOpenAIImageSize(request.size);
   if (imageSize) {
     imageConfig.image_size = imageSize;
   }
@@ -166,31 +155,20 @@ function buildImageConfig(request: GenerateRequest): Record<string, unknown> | u
   return Object.keys(imageConfig).length > 0 ? imageConfig : undefined;
 }
 
-function resolveImageSize(request: GenerateRequest): string | undefined {
-  if (request.normalizedSize?.preset === "2k") {
-    return "2K";
-  }
-  if (request.normalizedSize?.preset === "4k") {
-    return "4K";
-  }
-  if (request.normalizedSize && request.normalizedSize.source === "explicit") {
-    const maxDimension = Math.max(
-      request.normalizedSize.width,
-      request.normalizedSize.height
-    );
-    if (maxDimension <= 1024) {
-      return "1K";
-    }
-    if (maxDimension <= 2048) {
-      return "2K";
-    }
-    return "4K";
-  }
-  return undefined;
+function getRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
 }
 
-function parseJsonResponse(bodyText: string): OpenRouterResponse {
-  return JSON.parse(bodyText) as OpenRouterResponse;
+function parseJsonResponse(
+  bodyText: string,
+  tolerateInvalid = false
+): OpenRouterResponse {
+  return parseProviderJsonBody<OpenRouterResponse>("OpenRouter", bodyText, {
+    allowEmpty: tolerateInvalid,
+    tolerateInvalid
+  });
 }
 
 function parseImageResult(image: OpenRouterImagePayload): ProviderImageResult | null {
@@ -203,7 +181,7 @@ function parseImageResult(image: OpenRouterImagePayload): ProviderImageResult | 
     const parsed = parseDataUrl(url);
     return {
       mimeType: parsed.mimeType,
-      outputFormat: inferOutputFormat(parsed.mimeType),
+      output_format: inferOutputFormat(parsed.mimeType),
       dataBase64: parsed.base64Data
     };
   }

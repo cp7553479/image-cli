@@ -101,8 +101,7 @@ process.stdin.on('end', () => {
       credential: {
         envName: "API_KEY",
         value: "plugin-key"
-      },
-      preparedImages: []
+      }
     });
 
     expect(operation.request).toMatchObject({
@@ -138,8 +137,7 @@ process.stdin.on('end', () => {
         credential: {
           envName: "API_KEY",
           value: "plugin-key"
-        },
-        preparedImages: []
+        }
       }
     );
 

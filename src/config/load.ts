@@ -22,6 +22,7 @@ export async function loadResolvedConfig(
 ): Promise<ResolvedConfig> {
   const homeDir = options.homeDir ?? os.homedir();
   const paths = getImageConfigPaths(homeDir);
+  // See docs/error-handling.md#config-errors for config diagnostics.
   const configContents = await readFile(paths.configFile, "utf8").catch((error) => {
     const message = toErrorMessage(error);
     if (message.includes("ENOENT")) {

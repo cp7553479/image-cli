@@ -3,27 +3,25 @@ import { describe, expect, test, vi } from "vitest";
 import { qwenProvider } from "../../src/providers/qwen/index.js";
 
 describe("qwen provider", () => {
-  test("builds sync multimodal generation requests with prepared images", async () => {
+  test("builds sync multimodal generation requests from OpenAI-compatible options", async () => {
     const operation = await qwenProvider.buildGenerateOperation({
       request: {
         prompt: "draw a cat",
         model: {
           providerId: "qwen",
-          providerAlias: "qwen-image",
-          modelId: "qwen-image-plus"
+          providerAlias: "qwen",
+          modelId: "qwen-vl-max"
         },
-        size: "2k",
-        normalizedSize: {
-          source: "preset",
-          preset: "2k",
-          width: 2048,
-          height: 2048,
-          aspectRatio: "1:1",
-          raw: "2k"
-        },
-        count: 2,
-        negativePrompt: "blurry",
-        seed: 7,
+        size: "2048x2048",
+        n: 2,
+        quality: "high",
+        background: "opaque",
+        output_format: "webp",
+        moderation: "low",
+        response_format: "b64_json",
+        stream: true,
+        partial_images: 1,
+        user: "agent-1",
         extra: {
           prompt_extend: false,
           watermark: true
@@ -42,20 +40,7 @@ describe("qwen provider", () => {
       credential: {
         envName: "DASHSCOPE_API_KEY",
         value: "secret-key"
-      },
-      preparedImages: [
-        {
-          source: "inline-1",
-          kind: "inline",
-          mimeType: "image/png",
-          base64Data: "YmFzZTY0LWltYWdl"
-        },
-        {
-          source: "url-1",
-          kind: "url",
-          url: "https://example.com/reference.png"
-        }
-      ]
+      }
     });
 
     expect(operation.request).toEqual({
@@ -66,30 +51,67 @@ describe("qwen provider", () => {
         "Content-Type": "application/json"
       },
       json: {
-        model: "qwen-image-plus",
+        model: "qwen-vl-max",
         input: {
           messages: [
             {
               role: "user",
               content: [
-                { text: "draw a cat" },
-                { image: "data:image/png;base64,YmFzZTY0LWltYWdl" },
-                { image: "https://example.com/reference.png" }
+                { text: "draw a cat" }
               ]
             }
           ]
         },
         parameters: {
-          size: "2048*2048",
-          n: 2,
-          negative_prompt: "blurry",
-          seed: 7,
           prompt_extend: false,
-          watermark: true
+          watermark: true,
+          n: 2,
+          quality: "high",
+          background: "opaque",
+          output_format: "webp",
+          moderation: "low",
+          response_format: "b64_json",
+          stream: true,
+          partial_images: 1,
+          user: "agent-1",
+          size: "2048*2048",
         }
       },
       timeoutMs: 30_000
     });
+    expect(operation.followUp).toBeUndefined();
+  });
+
+  test("keeps qwen-image versioned models on the sync endpoint", async () => {
+    const operation = await qwenProvider.buildGenerateOperation({
+      request: {
+        prompt: "draw a cat",
+        model: {
+          providerId: "qwen",
+          providerAlias: "qwen",
+          modelId: "qwen-image-2.0-pro"
+        },
+        size: "1328x1328"
+      },
+      providerConfig: {
+        enabled: true,
+        apiBaseUrl: "https://dashscope.aliyuncs.com/api/v1/",
+        timeoutMs: 30_000,
+        retryPolicy: {
+          maxAttempts: 3
+        },
+        apiKey: "secret-key",
+        credentials: []
+      },
+      credential: {
+        envName: "DASHSCOPE_API_KEY",
+        value: "secret-key"
+      }
+    });
+
+    expect(operation.request.url).toBe(
+      "https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation"
+    );
     expect(operation.followUp).toBeUndefined();
   });
 
@@ -101,9 +123,6 @@ describe("qwen provider", () => {
           providerId: "qwen",
           providerAlias: "qwen-image",
           modelId: "qwen-image"
-        },
-        extra: {
-          prompt_extend: true
         }
       },
       providerConfig: {
@@ -119,8 +138,7 @@ describe("qwen provider", () => {
       credential: {
         envName: "DASHSCOPE_API_KEY",
         value: "secret-key"
-      },
-      preparedImages: []
+      }
     });
 
     expect(operation.request).toEqual({
@@ -136,9 +154,7 @@ describe("qwen provider", () => {
         input: {
           prompt: "a poster"
         },
-        parameters: {
-          prompt_extend: true
-        }
+        parameters: {}
       },
       timeoutMs: 30_000
     });
@@ -230,8 +246,7 @@ describe("qwen provider", () => {
       credential: {
         envName: "DASHSCOPE_API_KEY",
         value: "secret-key"
-      },
-      preparedImages: []
+      }
     });
 
     expect(parsed.images).toEqual([
@@ -258,23 +273,33 @@ describe("qwen provider", () => {
       reason: "Qwen returned HTTP 502."
     });
   });
+
+  test("throws qwen error responses before extracting images", async () => {
+    await expect(
+      qwenProvider.parseGenerateResponse(
+        {
+          statusCode: 401,
+          headers: {},
+          bodyText: JSON.stringify({
+            code: "InvalidApiKey",
+            message: "Invalid API key"
+          }),
+          stderrText: "",
+          exitCode: 0
+        },
+        makeParseContext()
+      )
+    ).rejects.toThrow(
+      /Qwen request failed with HTTP 401: InvalidApiKey: Invalid API key/
+    );
+  });
 });
 
-function makeCurlResult(payload: Record<string, unknown>) {
+function makeCurlResult(body: unknown) {
   return {
     statusCode: 200,
     headers: {},
-    bodyText: JSON.stringify(payload),
-    stderrText: "",
-    exitCode: 0
-  };
-}
-
-function makeStatusResult(statusCode: number) {
-  return {
-    statusCode,
-    headers: {},
-    bodyText: "",
+    bodyText: JSON.stringify(body),
     stderrText: "",
     exitCode: 0
   };
@@ -282,7 +307,40 @@ function makeStatusResult(statusCode: number) {
 
 function makeFailureContext(statusCode: number) {
   return {
-    error: new Error(`HTTP ${statusCode}`),
-    response: makeStatusResult(statusCode)
+    error: new Error("boom"),
+    response: {
+      statusCode,
+      headers: {},
+      bodyText: "{}",
+      stderrText: "",
+      exitCode: 0
+    }
+  };
+}
+
+function makeParseContext() {
+  return {
+    request: {
+      prompt: "draw a cat",
+      model: {
+        providerId: "qwen",
+        providerAlias: "qwen",
+        modelId: "qwen-vl-max"
+      }
+    },
+    providerConfig: {
+      enabled: true,
+      apiBaseUrl: "https://dashscope.aliyuncs.com/api/v1",
+      timeoutMs: 30_000,
+      retryPolicy: {
+        maxAttempts: 3
+      },
+      apiKey: "secret-key",
+      credentials: []
+    },
+    credential: {
+      envName: "DASHSCOPE_API_KEY",
+      value: "secret-key"
+    }
   };
 }

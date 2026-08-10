@@ -1,16 +1,14 @@
-# Image-Cli: An agent-native image tool
+# Image CLI
 
 [中文说明 / README_CN](./README_CN.md)
 
-`image` is a local multi-provider image generation CLI.
+`image` is a local, agent-oriented image generation CLI. It routes a single
+OpenAI-compatible image generation request shape to configured providers, saves
+outputs, and prints compact agent-friendly results.
 
-It standardizes:
-
-- command surface
-- config layout
-- provider routing
-- output saving
-- provider-specific escape hatches through `--extra`
+The published runtime has no third-party dependencies. Runtime code uses Node
+built-ins plus `curl` for HTTP transport. Development dependencies are used only
+for TypeScript, linting, build, and tests.
 
 Built-in providers:
 
@@ -21,7 +19,7 @@ Built-in providers:
 - Qwen
 - MiniMax
 
-It also supports custom providers installed under `~/.image/plugins/`.
+Custom providers can be installed under `~/.image/plugins/`.
 
 ## Install
 
@@ -29,526 +27,123 @@ It also supports custom providers installed under `~/.image/plugins/`.
 npm install -g @cp7553479/image-cli
 ```
 
-Verify installation:
+Verify:
 
 ```bash
 image --help
 image generate --help
 image config --help
+image provider --help
 ```
 
 ## Quick Start
 
-1. Initialize local config:
-
 ```bash
 image config init
-```
-
-2. Open [`~/.image/config.json`](/Users/vincent/.image/config.json).
-
-3. Set the top-level `defaultModel` in `provider/modelid` form.
-
-4. Fill each provider's `api_key`.
-
-5. Verify configuration:
-
-```bash
 image config doctor --json
+image provider list
+image provider openai model list
+image generate "A cinematic fox poster in snowfall" --model openai/gpt-image-1.5
 ```
 
-6. Generate:
+If `--model` is omitted, the CLI uses top-level `config.defaultModel`.
 
-```bash
-image generate "A cinematic fox poster in snowfall"
-```
-
-If `--model` is omitted, the CLI uses `config.defaultModel`.
-
-## Command Reference
-
-### `image`
-
-Root command.
-
-It exposes:
-
-- `image generate <prompt>`
-- `image config init`
-- `image config path`
-- `image config show`
-- `image config doctor`
-- `image config providers`
-
-The root help is intentionally concise.
-Use `image generate --help` and `image config --help` for full command details.
-
-### `image generate`
-
-Usage:
+## Generate
 
 ```bash
 image generate "<prompt>" [flags]
 ```
 
-Arguments:
-
-- `<prompt>`
-  Required.
-  The generation prompt text.
-
-Flags:
+Supported flags:
 
 - `--model <provider/model>`
-  Optional if `config.defaultModel` is set.
-  Explicitly chooses the provider and the provider-native model id.
-
-- `--size <preset|WIDTHxHEIGHT>`
-  Optional.
-  Normalized size input.
-  Supported presets:
-  - `2k`
-  - `4k`
-  Explicit dimensions example:
-  - `1536x1024`
-
-- `--aspect <ratio>`
-  Optional.
-  Normalized aspect ratio.
-  Supported values:
-  - `1:1`
-  - `4:3`
-  - `3:4`
-  - `16:9`
-  - `9:16`
-  - `3:2`
-  - `2:3`
-  - `21:9`
-
+- `--size <auto|WIDTHxHEIGHT>`
 - `--n <count>`
-  Optional.
-  Requested output count.
-  Provider support differs; some providers clamp or ignore it.
-
-- `--image <pathOrUrl>`
-  Optional and repeatable.
-  Reference image input.
-  Can be:
-  - a local file path
-  - an HTTP/HTTPS URL
-
 - `--quality <value>`
-  Optional.
-  Provider-native quality hint.
-  Not normalized across all providers.
-
-- `--format <png|jpeg|webp>`
-  Optional.
-  Preferred output format when the provider supports it.
-
 - `--background <auto|opaque|transparent>`
-  Optional.
-  Provider-native background mode.
-  Most relevant for OpenAI-style image APIs.
-
-- `--seed <integer>`
-  Optional.
-  Deterministic seed when the provider supports it.
-
+- `--output-format <png|jpeg|webp>`
+- `--output-compression <0-100>`
+- `--moderation <auto|low>`
+- `--response-format <url|b64_json>`
 - `--stream`
-  Optional.
-  Enables provider streaming when supported.
-
+- `--partial-images <count>`
+- `--style <vivid|natural>`
+- `--user <id>`
+- `--extra <json object>`
 - `--output-dir <path>`
-  Optional.
-  Directory where generated files and `manifest.json` are written.
-  Default:
-
-  ```text
-  ./image-output/<timestamp>/
-  ```
-
 - `--json`
-  Optional.
-  Prints the output manifest as JSON instead of plain text.
 
-- `--extra <json>`
-  Optional.
-  Provider-specific JSON object for features that are not normalized by the CLI.
+`--extra` is for provider-specific options beyond the OpenAI-compatible
+fields. It must be a JSON object and cannot override standard fields such as
+`model`, `prompt`, `size`, `n`, or `output_format`.
 
-### `--extra`
+The CLI validates only the common request shape. Provider-specific option
+support is decided by the remote provider response.
 
-Use `--extra` for provider-only parameters.
-
-Examples:
+Example:
 
 ```bash
---extra '{"watermark":false}'
---extra '{"response_format":"base64"}'
---extra '{"prompt_optimizer":true}'
+image generate "Editorial portrait with dramatic rim light" \
+  --model openai/gpt-image-1.5 \
+  --size 1536x1024 \
+  --n 1 \
+  --quality high \
+  --output-format png \
+  --response-format b64_json
 ```
 
-Rules:
+`--model` uses `provider/modelid`. The provider segment is used for local
+routing. The model segment is sent to the provider unchanged.
 
-- must be a JSON object
-- cannot override normalized fields such as `prompt`, `model`, `size`, `images`, or `seed`
-- should be used for provider-only features that do not exist consistently across providers
+## Output
 
-## Is `negative_prompt` a universal CLI flag?
+Plain successful output is intentionally compact:
 
-No.
+```text
+/absolute/path/to/image-1.png
+manifest: /absolute/path/to/manifest.json
+warning: optional warning text
+```
 
-It is not exposed as a top-level normalized flag because official provider support is not consistent.
+Use `--json` for the full output manifest. Token usage in manifests is
+normalized to OpenAI-style fields when provider responses expose usage data:
+`input_tokens`, `output_tokens`, `total_tokens`, `input_tokens_details`, and
+`output_tokens_details`.
 
-Provider status from official docs:
-
-- OpenAI Images API: no documented `negative_prompt`
-  - [OpenAI Image Generation](https://platform.openai.com/docs/guides/images/image-generation)
-- Gemini native image generation: no documented `negative_prompt`
-  - [Gemini Image Generation](https://ai.google.dev/gemini-api/docs/image-generation)
-- Seedream / Ark image generation: no documented normalized `negative_prompt`
-  - [Seedream Image Generation](https://www.volcengine.com/docs/82379/1541523)
-- MiniMax image generation: no documented `negative_prompt`
-  - [MiniMax Text to Image](https://platform.minimax.io/docs/api-reference/image-generation-t2i)
-- Qwen Image: official docs do document `negative_prompt`
-  - [Qwen Image API](https://help.aliyun.com/zh/model-studio/qwen-image-api)
-  - [Qwen Image Edit API](https://help.aliyun.com/zh/model-studio/qwen-image-edit-api)
-- OpenRouter image generation: no guaranteed universal top-level `negative_prompt` contract across routed models
-  - [OpenRouter Image Generation](https://openrouter.ai/docs/guides/overview/multimodal/image-generation)
-
-If you need `negative_prompt` for a provider that officially supports it, pass it through `--extra`.
-
-Example for Qwen:
+## Config
 
 ```bash
-image generate "A clean drink poster" \
-  --model qwen/qwen-image-2.0-pro \
-  --extra '{"negative_prompt":"low quality, blurry, distorted text"}'
+image config init
+image config path
+image config show --json
+image config doctor --json
+image config providers --json
 ```
 
-### `image config init`
-
-Copies the initialization templates into `~/.image/` and the supported skill directories.
-
-Behavior:
-
-- creates `config.json` if missing
-- creates `config.example.jsonc` if missing
-- creates `README.md` if missing
-- creates missing bundled `image-cli` skill files under `~/.image/skills/image-cli/`
-- creates missing bundled `image-cli` skill files under `~/.claude/skills/image-cli/`
-- creates missing bundled `image-cli` skill files under `~/.agents/skills/image-cli/`
-- creates missing bundled `image-cli` skill files under `~/.codex/skills/image-cli/`
-- creates missing bundled `image-cli` skill files under `~/antigravity/skills/image-cli/`
-- if `~/.image/` already exists, it checks each managed file and only fills the missing ones
-- `--force` overwrites all managed config and skill files
-
-Flags:
-
-- `--force`
-  Overwrite all managed config and skill files.
-
-### `image config path`
-
-Prints the config and skill paths used by the CLI.
-
-No flags.
-
-### `image config show`
-
-Prints sanitized resolved config.
-
-Flags:
-
-- `--json`
-  Print JSON output.
-
-What it shows:
+`~/.image/config.json` contains:
 
 - top-level `defaultModel`
-- per-provider enablement
-- base URLs
-- timeout and retry settings
-- whether `api_key` is present
+- provider enablement
+- provider base URLs
+- timeouts
+- ordered `api_key` values
 
-What it does not show:
+Secrets must stay out of tracked files.
 
-- raw secrets
-
-### `image config doctor`
-
-Runs diagnostics.
-
-Flags:
-
-- `--json`
-  Print JSON output.
-
-Checks include:
-
-- config file existence
-- README existence
-- `curl` availability
-- per-provider credential counts
-
-### `image config providers`
-
-Lists built-in providers and installed plugin providers.
-
-Flags:
-
-- `--json`
-  Print JSON output.
-
-## Configuration Layout
-
-The CLI uses:
-
-- [`~/.image/config.json`](/Users/vincent/.image/config.json)
-- [`~/.image/config.example.jsonc`](/Users/vincent/.image/config.example.jsonc)
-- [`~/.image/README.md`](/Users/vincent/.image/README.md)
-- `~/.image/skills/image-cli/SKILL.md`
-- `~/.image/skills/image-cli/README.md`
-- `~/.claude/skills/image-cli/SKILL.md`
-- `~/.claude/skills/image-cli/README.md`
-- `~/.agents/skills/image-cli/SKILL.md`
-- `~/.agents/skills/image-cli/README.md`
-- `~/.codex/skills/image-cli/SKILL.md`
-- `~/.codex/skills/image-cli/README.md`
-- `~/antigravity/skills/image-cli/SKILL.md`
-- `~/antigravity/skills/image-cli/README.md`
-- `~/.image/plugins/<plugin-name>/plugin.json`
-
-## `config.json`
-
-Top-level structure:
-
-```json
-{
-  "version": 1,
-  "defaultModel": "openai/gpt-image-1.5",
-  "providers": {
-    "openai": {
-      "enabled": true,
-      "apiBaseUrl": "https://api.openai.com/v1",
-      "timeoutMs": 120000,
-      "retryPolicy": {
-        "maxAttempts": 2
-      },
-      "api_key": ["YOUR_OPENAI_API_KEY"]
-    }
-  }
-}
-```
-
-### Top-level fields
-
-- `version`
-  Config schema version.
-
-- `defaultModel`
-  Default routing target in `provider/modelid` format.
-  This is what the CLI uses when `--model` is omitted.
-
-- `providers`
-  Provider config map keyed by provider id.
-  This includes both built-in providers and plugin providers.
-
-### Per-provider fields
-
-- `enabled`
-- `apiBaseUrl`
-- `timeoutMs`
-- `retryPolicy.maxAttempts`
-- `api_key`
-
-### `api_key`
-
-Supported formats:
-
-Single key:
-
-```json
-"api_key": "your-api-key"
-```
-
-Ordered failover keys:
-
-```json
-"api_key": ["your-api-key-1", "your-api-key-2"]
-```
-
-If an array is provided, the CLI tries the keys in order for same-provider failover.
-
-## Built-in Provider Defaults
-
-Template defaults:
-
-- `defaultModel`: `openai/gpt-image-1.5`
-- `openai`: `https://api.openai.com/v1`
-- `openrouter`: `https://openrouter.ai/api/v1`
-- `gemini`: `https://generativelanguage.googleapis.com/v1beta`
-- `seedream`: `https://ark.cn-beijing.volces.com/api/v3`
-- `qwen`: `https://dashscope.aliyuncs.com/api/v1`
-- `minimax`: `https://api.minimax.io/v1`
-
-Seedream note:
-
-- depending on your Ark account/model availability, you may need a versioned model id such as `doubao-seedream-4-5-251128`
-
-## Provider IDs, Docs, and API Key Links
-
-### OpenAI
-
-- Provider id: `openai`
-- Alias: `chatgpt-image`
-- Docs: [OpenAI Image Generation](https://platform.openai.com/docs/guides/images/image-generation)
-- Model docs: [GPT Image 1.5](https://platform.openai.com/docs/models/gpt-image-1.5)
-- API keys: [OpenAI API Keys](https://platform.openai.com/api-keys)
-- Signup: [OpenAI Platform Signup](https://platform.openai.com/signup)
-
-### OpenRouter
-
-- Provider id: `openrouter`
-- Alias: `openrouter-image`
-- Docs: [OpenRouter Image Generation](https://openrouter.ai/docs/guides/overview/multimodal/image-generation)
-- API reference: [OpenRouter API Reference](https://openrouter.ai/docs/api-reference/overview)
-- API keys: [OpenRouter Keys](https://openrouter.ai/settings/keys)
-- Signup: [OpenRouter Sign In](https://openrouter.ai/sign-in)
-
-### Gemini
-
-- Provider id: `gemini`
-- Alias: `nano-banana`
-- Docs: [Gemini Image Generation](https://ai.google.dev/gemini-api/docs/image-generation)
-- API key docs: [Gemini API Key Guide](https://ai.google.dev/gemini-api/docs/api-key)
-- API keys: [Google AI Studio API Keys](https://aistudio.google.com/apikey)
-- API reference: [Gemini API Reference](https://ai.google.dev/api)
-
-### Seedream
-
-- Provider id: `seedream`
-- Aliases: `seedream`, `doubao-seedream`
-- Docs:
-  - [Seedream Image Generation](https://www.volcengine.com/docs/82379/1541523)
-  - [Ark Quick Start](https://www.volcengine.com/docs/82379/1399008?lang=zh)
-- Console: [Volcengine Ark Console](https://console.volcengine.com/ark)
-- API key guidance: [Volcengine Ark API Key Guide](https://www.volcengine.com/docs/6559/2310296)
-
-### Qwen
-
-- Provider id: `qwen`
-- Alias: `qwen-image`
-- Docs:
-  - [Qwen Image API](https://help.aliyun.com/zh/model-studio/qwen-image-api)
-  - [Qwen Image Edit API](https://help.aliyun.com/zh/model-studio/qwen-image-edit-api)
-- Model catalog: [Alibaba Model Studio Models](https://help.aliyun.com/zh/model-studio/model)
-- Console: [Alibaba Model Studio](https://bailian.console.aliyun.com/)
-
-### MiniMax
-
-- Provider id: `minimax`
-- Alias: `minimax-image`
-- Docs:
-  - [MiniMax Image Generation Overview](https://platform.minimax.io/docs/api-reference/image-generation-intro)
-  - [MiniMax Text to Image](https://platform.minimax.io/docs/api-reference/image-generation-t2i)
-  - [MiniMax Image Generation Guide](https://platform.minimax.io/docs/guides/image-generation)
-- Console: [MiniMax Platform](https://platform.minimax.io/)
-
-## Custom Provider Plugins
-
-You only need this section if you want `image` to call a provider that is not built in.
-
-For normal use of built-in providers, skip this section.
-
-### Why does this feature exist?
-
-The CLI keeps one stable user-facing command surface:
-
-- `image generate "<prompt>"`
-- `--model provider/modelid`
-- `--size`
-- `--aspect`
-- `--image`
-- `--extra`
-
-But every provider has different implementation details:
-
-- auth header format
-- request body format
-- sync vs async flow
-- where image results are returned
-
-The built-in providers solve this internally.
-
-The custom plugin system exists so you can add the same kind of adapter for a provider that is not shipped with the CLI, without changing the CLI itself.
-
-### How should a beginner think about it?
-
-Do not think of a plugin as "extending the whole CLI".
-
-Think of it as only adding one translator layer:
-
-- the CLI already knows how to parse commands, load config, rotate keys, and save output
-- the plugin only teaches the CLI how to talk to one extra provider
-
-In practice, that means:
-
-1. you still run the normal `image generate ...` command
-2. the provider id still appears in `config.json` and `--model`
-3. the plugin only converts between the CLI's normalized request and the provider's real API
-
-### Where does a plugin live?
-
-Custom providers are installed under:
-
-```text
-~/.image/plugins/<plugin-name>/
-```
-
-Each plugin must contain a registration file:
-
-```text
-~/.image/plugins/<plugin-name>/plugin.json
-```
-
-### How is a plugin routed?
-
-Once a plugin registers a `providerId`, the CLI routes it exactly like a built-in provider.
-
-The same provider id appears in:
-
-- in `config.defaultModel`
-- in `image generate --model <provider/model>`
-- in `config.providers.<providerId>`
-
-### What is the minimum mental model?
-
-For a newcomer, this is the shortest accurate explanation:
-
-- `plugin.json` says which provider id the plugin owns
-- the plugin script builds the real HTTP request for that provider
-- the plugin script parses the provider response back into the CLI's common result format
-
-If you understand those three lines, you understand the plugin system.
-
-### Where is the full developer guide?
-
-For the full explanation, including:
-
-- the beginner-friendly architecture walkthrough
-- what `plugin.json` does
-- what `build-generate` and `parse-generate` do
-- what JSON comes in and out
-- common beginner mistakes and questions
-
-- [plugins/PLUGINS_README.md](plugins/PLUGINS_README.md)
-
-## Development
+## Provider Discovery
 
 ```bash
-npm install
-npm run check
-npm test
-npm run build
+image provider list
+image provider list --json
+image provider openai model list
+image provider openai model list --json --limit 20
 ```
+
+Model listing uses provider APIs where the built-in integration supports it. If
+API discovery is unavailable, output includes an English warning that built-in
+model ids may be incomplete or outdated.
+
+## Public Behavior Source
+
+`SPEC.md` is the public behavior contract. Production behavior changes must
+update source, tests, docs, generated help, and the bundled `image-cli` skill.

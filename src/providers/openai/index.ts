@@ -8,6 +8,13 @@ import type {
   ProviderPlugin,
   ProviderImageResult
 } from "../types.js";
+import { getBuiltInProviderAliases } from "../identity.js";
+import { collectOpenAIImageRequestFields } from "../openai-image-options.js";
+import {
+  assertSuccessfulResponse,
+  parseJsonBody as parseProviderJsonBody,
+  parseSseJsonData
+} from "../response.js";
 
 const OPENAI_IMAGES_GENERATIONS_PATH = "/images/generations";
 /**
@@ -15,37 +22,23 @@ const OPENAI_IMAGES_GENERATIONS_PATH = "/images/generations";
  */
 export const openaiProviderPlugin: ProviderPlugin = {
   providerId: "openai",
-  aliases: ["chatgpt-image"],
+  aliases: getBuiltInProviderAliases("openai"),
   capabilities: {
     generate: true,
     edit: false,
-    inputImages: false,
     asyncTasks: false,
     streaming: true,
     background: true,
-    negativePrompt: false,
     multipleOutputs: true,
     transparentOutput: true
   },
   async buildGenerateOperation(input: ProviderGenerateContext): Promise<ProviderOperation> {
-    if (input.preparedImages.length > 0) {
-      throw new Error("OpenAI generate does not accept images in v1.");
-    }
-
     const baseUrl = normalizeBaseUrl(input.providerConfig.apiBaseUrl);
     const requestBody = {
       ...(input.request.extra ?? {}),
-      model: input.request.model.modelId,
-      prompt: input.request.prompt,
-      n: input.request.count ?? 1,
-      size: resolveSize(input.request),
-      quality: input.request.quality,
-      background: input.request.background,
-      output_format: input.request.outputFormat,
-      output_compression: getProviderExtra(input.request.extra, "output_compression"),
-      stream: input.request.stream,
-      user: getProviderExtra(input.request.extra, "user"),
-      moderation: getProviderExtra(input.request.extra, "moderation")
+      ...collectOpenAIImageRequestFields(input.request, {
+        includeModelAndPrompt: true
+      })
     };
 
     return {
@@ -65,16 +58,18 @@ export const openaiProviderPlugin: ProviderPlugin = {
     result: CurlExecutionResult,
     input: ProviderGenerateContext
   ): Promise<GenerateResult> {
-    const parsed = parseJsonBody(result.bodyText);
+    const parsed = parseOpenAIResponse(result, input.request.stream === true);
+    assertSuccessfulResponse("OpenAI", result, parsed);
+
     const data = Array.isArray(parsed?.data) ? parsed.data : [];
-    const outputFormat = resolveOutputFormat(input.request) ?? "png";
-    const mimeType = mimeTypeForFormat(outputFormat);
+    const output_format = input.request.output_format ?? "png";
+    const mimeType = mimeTypeForFormat(output_format);
 
     return {
       providerId: "openai",
       modelId: input.request.model.modelId,
       images: data.map((item: Record<string, unknown>) =>
-        toProviderImageResult(item, outputFormat, mimeType)
+        toProviderImageResult(item, output_format, mimeType)
       ),
       warnings: collectWarnings(parsed),
       raw: parsed,
@@ -126,48 +121,69 @@ function normalizeBaseUrl(baseUrl: string): string {
   return trimmed.endsWith("/") ? trimmed : `${trimmed}/`;
 }
 
-function resolveSize(request: ProviderGenerateContext["request"]): string | undefined {
-  if (request.normalizedSize) {
-    return `${request.normalizedSize.width}x${request.normalizedSize.height}`;
+function parseOpenAIResponse(
+  result: CurlExecutionResult,
+  stream: boolean
+): Record<string, unknown> {
+  const bodyText = result.bodyText.trim();
+  if (stream && bodyText.includes("data:")) {
+    return parseOpenAIStreamResponse(bodyText);
   }
-  return request.size;
+
+  return parseProviderJsonBody<Record<string, unknown>>("OpenAI", result.bodyText, {
+    allowEmpty: result.statusCode >= 400,
+    tolerateInvalid: result.statusCode >= 400
+  });
 }
 
-function resolveOutputFormat(
-  request: ProviderGenerateContext["request"]
-): "png" | "jpeg" | "webp" | undefined {
-  const extraOutputFormat = getProviderExtra(request.extra, "output_format");
-  if (request.outputFormat) {
-    return request.outputFormat;
-  }
-  if (extraOutputFormat === "png" || extraOutputFormat === "jpeg" || extraOutputFormat === "webp") {
-    return extraOutputFormat;
-  }
-  return undefined;
-}
+function parseOpenAIStreamResponse(bodyText: string): Record<string, unknown> {
+  const events = parseSseJsonData<Record<string, unknown>>("OpenAI", bodyText);
+  const completed: Record<string, unknown>[] = [];
+  const streamed: Record<string, unknown>[] = [];
+  let usage: unknown;
 
-function getProviderExtra(
-  extra: Record<string, unknown> | undefined,
-  key: string
-): unknown {
-  return extra ? extra[key] : undefined;
-}
+  for (const event of events) {
+    appendStreamImage(event, completed, streamed);
 
-/** 解析 OpenAI JSON 响应；空响应返回 undefined。 */
-function parseJsonBody(bodyText: string): Record<string, unknown> | undefined {
-  if (!bodyText.trim()) {
-    return undefined;
-  }
-
-  try {
-    const parsed = JSON.parse(bodyText) as unknown;
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      throw new Error("Expected a JSON object.");
+    if (Array.isArray(event.data)) {
+      for (const item of event.data) {
+        if (item && typeof item === "object" && !Array.isArray(item)) {
+          appendStreamImage(item as Record<string, unknown>, completed, streamed);
+        }
+      }
     }
-    return parsed as Record<string, unknown>;
-  } catch (error) {
-    throw new Error(`Failed to parse OpenAI response JSON: ${toErrorMessage(error)}`);
+
+    if (event.usage) {
+      usage = event.usage;
+    }
   }
+
+  return {
+    data: completed.length > 0 ? completed : streamed,
+    events,
+    usage
+  };
+}
+
+function appendStreamImage(
+  event: Record<string, unknown>,
+  completed: Record<string, unknown>[],
+  streamed: Record<string, unknown>[]
+): void {
+  if (!isImageResult(event)) {
+    return;
+  }
+
+  if (event.type === "image_generation.completed") {
+    completed.push(event);
+    return;
+  }
+
+  streamed.push(event);
+}
+
+function isImageResult(value: Record<string, unknown>): boolean {
+  return typeof value.b64_json === "string" || typeof value.url === "string";
 }
 
 function collectWarnings(parsed: Record<string, unknown> | undefined): string[] {
@@ -202,11 +218,11 @@ function collectWarnings(parsed: Record<string, unknown> | undefined): string[] 
 
 function toProviderImageResult(
   item: Record<string, unknown>,
-  outputFormat: "png" | "jpeg" | "webp",
+  output_format: "png" | "jpeg" | "webp",
   mimeType: string
 ): ProviderImageResult {
   const result: ProviderImageResult = {
-    outputFormat,
+    output_format,
     mimeType
   };
 

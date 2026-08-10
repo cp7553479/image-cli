@@ -2,28 +2,55 @@ import type { CredentialEntry, ResolvedProviderConfig } from "../config/types.js
 import type { GenerateRequest, ProviderCapabilities } from "../protocol/request.js";
 import type { CurlExecutionResult, CurlRequest } from "../transport/curl.js";
 
-export type PreparedImageInput =
-  | {
-      source: string;
-      kind: "url";
-      url: string;
-    }
-  | {
-      source: string;
-      kind: "inline";
-      mimeType: string;
-      base64Data: string;
-    };
-
 export type ProviderGenerateContext = {
   request: GenerateRequest;
   providerConfig: ResolvedProviderConfig;
   credential: CredentialEntry;
-  preparedImages: PreparedImageInput[];
+};
+
+export type BuiltInInterfaceAdapterId =
+  | "native-image"
+  | "openai-compatible-chat"
+  | "gemini-generate-content";
+
+export type InterfaceAdapterId = BuiltInInterfaceAdapterId | (string & {});
+
+export type ProviderAuthProfile =
+  | {
+      type: "bearer";
+      headerName?: string;
+      scheme?: string;
+    }
+  | {
+      type: "api-key-header";
+      headerName: string;
+    }
+  | {
+      type: "api-key-query";
+      queryName: string;
+    }
+  | {
+      type: "none";
+    };
+
+export type ProviderProfile = {
+  providerId: string;
+  aliases: string[];
+  baseUrl: string;
+  auth: ProviderAuthProfile;
+  capabilities: ProviderCapabilities;
+  interfaceAdapter: InterfaceAdapterId;
+};
+
+export type InterfaceAdapterGenerateContext = {
+  request: GenerateRequest;
+  profile: ProviderProfile;
+  credential?: CredentialEntry;
+  timeoutMs?: number;
 };
 
 export type ProviderImageResult = {
-  outputFormat?: string;
+  output_format?: string;
   mimeType?: string;
   fileName?: string;
   dataBase64?: string;
@@ -32,15 +59,38 @@ export type ProviderImageResult = {
   warnings?: string[];
 };
 
+export type NormalizedUsage = {
+  input_tokens?: number;
+  output_tokens?: number;
+  total_tokens?: number;
+  input_tokens_details?: {
+    cached_tokens?: number;
+  };
+  output_tokens_details?: {
+    reasoning_tokens?: number;
+  };
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  prompt_tokens_details?: {
+    cached_tokens?: number;
+  };
+  completion_tokens_details?: {
+    reasoning_tokens?: number;
+  };
+};
+
+export type ProviderUsage = NormalizedUsage | Record<string, unknown>;
+
 export type GenerateResult = {
   providerId: string;
   modelId: string;
   images: ProviderImageResult[];
   warnings: string[];
   raw: unknown;
-  usage?: Record<string, unknown>;
+  usage?: ProviderUsage;
 };
 
+// See docs/error-handling.md#provider-failure-classification for runtime actions.
 export type FailureClassification =
   | {
       kind: "retryable-credential";
@@ -69,6 +119,17 @@ export type ProviderOperation = {
       credential: CredentialEntry;
     }
   ) => Promise<CurlExecutionResult>;
+};
+
+export type InterfaceAdapter = {
+  adapterId: InterfaceAdapterId;
+  buildGenerateOperation(
+    input: InterfaceAdapterGenerateContext
+  ): Promise<ProviderOperation> | ProviderOperation;
+  parseGenerateResponse(
+    result: CurlExecutionResult,
+    input: InterfaceAdapterGenerateContext
+  ): Promise<GenerateResult> | GenerateResult;
 };
 
 export type ProviderErrorContext = {

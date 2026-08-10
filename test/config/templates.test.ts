@@ -1,38 +1,12 @@
 import { describe, expect, test } from "vitest";
-import { existsSync } from "node:fs";
-import path from "node:path";
-import { pathToFileURL } from "node:url";
 
 import {
   buildConfigTemplates,
-  getConfigTemplatePaths,
-  resolveConfigTemplateRoot
-} from "../../src/config/templates.js";
+  listConfigInitTemplateFiles,
+  listSkillInitTemplateFiles
+} from "../../src/config/init-templates.js";
 
 describe("config templates", () => {
-  test("points to initialization template directories", () => {
-    const paths = getConfigTemplatePaths();
-
-    expect(paths.templateDir).toContain("templates/init");
-    expect(paths.skillDir).toContain("templates/init/skills/image-cli");
-    expect(existsSync(path.join(paths.templateDir, "config.json"))).toBe(true);
-    expect(existsSync(path.join(paths.templateDir, "config.example.jsonc"))).toBe(true);
-    expect(existsSync(path.join(paths.templateDir, "README.md"))).toBe(true);
-    expect(existsSync(path.join(paths.templateDir, "skills", "image-cli", "SKILL.md"))).toBe(true);
-    expect(existsSync(path.join(paths.templateDir, "image-config"))).toBe(false);
-    expect(existsSync(path.join(paths.templateDir, "skill"))).toBe(false);
-  });
-
-  test("resolves template directory from compiled dist modules", () => {
-    const distModuleUrl = pathToFileURL(
-      path.join(process.cwd(), "dist", "src", "config", "templates.js")
-    ).href;
-
-    expect(resolveConfigTemplateRoot(distModuleUrl)).toBe(
-      path.join(process.cwd(), "templates", "init")
-    );
-  });
-
   test("returns beginner-friendly template files", () => {
     const templates = buildConfigTemplates();
 
@@ -48,5 +22,19 @@ describe("config templates", () => {
     expect(templates.skill).toContain("If this skill is missing or unavailable");
     expect(templates.skillReadme).toContain("image config init");
     expect(templates.configExample).not.toContain("retryableHttpStatus");
+  });
+
+  test("lists config and skill template files from source-owned templates", () => {
+    expect(listConfigInitTemplateFiles().map((entry) => entry.relativePath).sort()).toEqual([
+      "README.md",
+      "config.example.jsonc",
+      "config.json",
+      "skills/image-cli/README.md",
+      "skills/image-cli/SKILL.md"
+    ]);
+    expect(listSkillInitTemplateFiles().map((entry) => entry.relativePath).sort()).toEqual([
+      "README.md",
+      "SKILL.md"
+    ]);
   });
 });

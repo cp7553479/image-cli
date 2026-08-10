@@ -5,6 +5,7 @@ import {
   parseModelRef,
   resolveProviderAlias
 } from "../../src/protocol/model-ref.js";
+import { PROVIDER_CATALOG } from "../../src/providers/catalog.js";
 
 describe("model ref parsing", () => {
   test("keeps canonical provider ids intact", () => {
@@ -24,14 +25,9 @@ describe("model ref parsing", () => {
   });
 
   test("exposes the canonical provider list", () => {
-    expect(CANONICAL_PROVIDER_IDS).toEqual([
-      "openai",
-      "openrouter",
-      "gemini",
-      "seedream",
-      "qwen",
-      "minimax"
-    ]);
+    expect(CANONICAL_PROVIDER_IDS).toEqual(
+      PROVIDER_CATALOG.map((entry) => entry.providerId)
+    );
   });
 
   test("rejects malformed model refs", () => {
@@ -46,6 +42,15 @@ describe("model ref parsing", () => {
     expect(resolveProviderAlias("chatgpt-image")).toBe("openai");
     expect(resolveProviderAlias("openrouter-image")).toBe("openrouter");
     expect(resolveProviderAlias("minimax-image")).toBe("minimax");
+  });
+
+  test("resolves every alias from provider catalog", () => {
+    for (const provider of PROVIDER_CATALOG) {
+      expect(resolveProviderAlias(provider.providerId)).toBe(provider.providerId);
+      for (const alias of provider.aliases) {
+        expect(resolveProviderAlias(alias)).toBe(provider.providerId);
+      }
+    }
   });
 
   test("accepts custom provider ids for plugin routing", () => {

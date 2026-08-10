@@ -1,9 +1,13 @@
 import path from "node:path";
-import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import os from "node:os";
 
 import { getImageConfigPaths } from "./paths.js";
-import { getConfigTemplatePaths } from "./templates.js";
+import {
+  listConfigInitTemplateFiles,
+  listSkillInitTemplateFiles,
+  type InitTemplateFile
+} from "./init-templates.js";
 
 type InitImageConfigDirectoryOptions = {
   homeDir?: string;
@@ -23,15 +27,14 @@ export async function initImageConfigDirectory(
 ): Promise<InitImageConfigDirectoryResult> {
   const homeDir = options.homeDir ?? os.homedir();
   const paths = getImageConfigPaths(homeDir);
-  const templatePaths = getConfigTemplatePaths();
 
   const created: string[] = [];
   const skipped: string[] = [];
   const force = options.force ?? false;
 
-  await copyTemplateDirectory(templatePaths.templateDir, paths.configDir, force, created, skipped);
+  await copyTemplateFiles(listConfigInitTemplateFiles(), paths.configDir, force, created, skipped);
   for (const skillDir of paths.skillInstallDirs.slice(1)) {
-    await copyTemplateDirectory(templatePaths.skillDir, skillDir, force, created, skipped);
+    await copyTemplateFiles(listSkillInitTemplateFiles(), skillDir, force, created, skipped);
   }
 
   return {
@@ -40,43 +43,30 @@ export async function initImageConfigDirectory(
   };
 }
 
-async function copyTemplateDirectory(
-  sourceDir: string,
+async function copyTemplateFiles(
+  files: InitTemplateFile[],
   targetDir: string,
   force: boolean,
   created: string[],
   skipped: string[]
 ): Promise<void> {
-  await mkdir(targetDir, { recursive: true });
-  const entries = await readdir(sourceDir, { withFileTypes: true });
-  entries.sort((left, right) => left.name.localeCompare(right.name));
-
-  for (const entry of entries) {
-    if (entry.name === ".DS_Store") {
-      continue;
-    }
-    const sourcePath = path.join(sourceDir, entry.name);
-    const targetPath = path.join(targetDir, entry.name);
-    if (entry.isDirectory()) {
-      await copyTemplateDirectory(sourcePath, targetPath, force, created, skipped);
-      continue;
-    }
-    if (entry.isFile()) {
-      await copyTemplateFile(sourcePath, targetPath, force, created, skipped);
-    }
+  const sortedFiles = [...files].sort((left, right) => left.relativePath.localeCompare(right.relativePath));
+  for (const file of sortedFiles) {
+    await copyTemplateFile(file, targetDir, force, created, skipped);
   }
 }
 
 async function copyTemplateFile(
-  sourcePath: string,
-  targetPath: string,
+  file: InitTemplateFile,
+  targetDir: string,
   force: boolean,
   created: string[],
   skipped: string[]
 ): Promise<void> {
-  const contents = await readFile(sourcePath);
+  const targetPath = path.join(targetDir, file.relativePath);
+  await mkdir(path.dirname(targetPath), { recursive: true });
   try {
-    await writeFile(targetPath, contents, {
+    await writeFile(targetPath, file.contents, {
       flag: force ? "w" : "wx"
     });
     created.push(targetPath);

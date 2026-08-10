@@ -6,12 +6,20 @@ import type {
 import type {
   FailureClassification,
   GenerateResult,
-  PreparedImageInput,
   ProviderErrorContext,
   ProviderGenerateContext,
   ProviderOperation,
   ProviderPlugin
 } from "../types.js";
+import { getBuiltInProviderAliases } from "../identity.js";
+import {
+  aspectRatioFromOpenAIImageSize,
+  collectOpenAIImageRequestFields
+} from "../openai-image-options.js";
+import {
+  assertSuccessfulResponse,
+  parseJsonBody as parseProviderJsonBody
+} from "../response.js";
 
 /** Gemini API 默认基地址。 */
 const DEFAULT_BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
@@ -29,6 +37,7 @@ type GeminiInlineData = {
 };
 
 type GeminiResponse = {
+  usageMetadata?: Record<string, unknown>;
   candidates?: Array<{
     content?: {
       parts?: GeminiInlineDataPart[];
@@ -42,15 +51,13 @@ type GeminiResponse = {
  */
 export const geminiProvider: ProviderPlugin = {
   providerId: "gemini",
-  aliases: ["gemini", "nano-banana"],
+  aliases: getBuiltInProviderAliases("gemini"),
   capabilities: {
     generate: true,
-    edit: true,
-    inputImages: true,
+    edit: false,
     asyncTasks: true,
     streaming: false,
     background: false,
-    negativePrompt: false,
     multipleOutputs: false,
     transparentOutput: false
   },
@@ -64,7 +71,9 @@ export const geminiProvider: ProviderPlugin = {
     result: CurlExecutionResult,
     input: ProviderGenerateContext
   ): Promise<GenerateResult> {
-    const payload = parseJsonResponse(result.bodyText);
+    const payload = parseJsonResponse(result.bodyText, result.statusCode >= 400);
+    assertSuccessfulResponse("Gemini", result, payload);
+
     const candidate = payload.candidates?.[0];
     const parts = candidate?.content?.parts ?? [];
     const images = parts
@@ -81,7 +90,7 @@ export const geminiProvider: ProviderPlugin = {
       images,
       warnings: [SYNTHID_WARNING],
       raw: payload,
-      usage: candidate?.usageMetadata
+      usage: payload.usageMetadata ?? candidate?.usageMetadata
     };
   },
   classifyFailure(context: ProviderErrorContext): FailureClassification {
@@ -121,7 +130,7 @@ export default geminiProvider;
 function buildGeminiGenerateRequest(input: ProviderGenerateContext): CurlRequest {
   const baseUrl = normalizeBaseUrl(input.providerConfig.apiBaseUrl);
   const modelId = encodeURIComponent(input.request.model.modelId);
-  const parts = buildGeminiParts(input.request, input.preparedImages);
+  const parts = buildGeminiParts(input.request);
 
   return {
     method: "POST",
@@ -130,6 +139,7 @@ function buildGeminiGenerateRequest(input: ProviderGenerateContext): CurlRequest
       "x-goog-api-key": input.credential.value
     },
     json: {
+      ...(input.request.extra ?? {}),
       contents: [
         {
           role: "user",
@@ -142,46 +152,39 @@ function buildGeminiGenerateRequest(input: ProviderGenerateContext): CurlRequest
   };
 }
 
-function buildGeminiParts(
-  request: GenerateRequest,
-  preparedImages: PreparedImageInput[]
-): Array<Record<string, unknown>> {
-  const parts: Array<Record<string, unknown>> = [
+function buildGeminiParts(request: GenerateRequest): Array<Record<string, unknown>> {
+  return [
     {
       text: request.prompt
     }
   ];
-
-  for (const image of preparedImages) {
-    if (image.kind === "url") {
-      throw new Error(
-        "Gemini provider does not accept prepared image urls in this implementation."
-      );
-    }
-
-    parts.push({
-      inlineData: {
-        mimeType: image.mimeType,
-        data: image.base64Data
-      }
-    });
-  }
-
-  return parts;
 }
 
 function buildGenerationConfig(request: GenerateRequest): Record<string, unknown> {
   const generationConfig: Record<string, unknown> = {
-    responseModalities: ["IMAGE"]
+    ...getRecord(request.extra?.generationConfig),
+    ...collectOpenAIImageRequestFields(request, {
+      includeSize: false
+    }),
+    responseModalities: ["Image"]
   };
 
-  if (request.aspectRatio) {
-    generationConfig.imageConfig = {
-      aspectRatio: request.aspectRatio
+  const aspectRatio = aspectRatioFromOpenAIImageSize(request.size);
+  if (aspectRatio) {
+    generationConfig.responseFormat = {
+      image: {
+        aspectRatio
+      }
     };
   }
 
   return generationConfig;
+}
+
+function getRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
 }
 
 function normalizeBaseUrl(value: string): string {
@@ -189,14 +192,11 @@ function normalizeBaseUrl(value: string): string {
   return trimmed.endsWith("/") ? trimmed.slice(0, -1) : trimmed || DEFAULT_BASE_URL;
 }
 
-/** 解析 Gemini JSON 响应体。 */
-function parseJsonResponse(bodyText: string): GeminiResponse {
-  try {
-    return JSON.parse(bodyText) as GeminiResponse;
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`Failed to parse Gemini response JSON. ${message}`);
-  }
+function parseJsonResponse(bodyText: string, tolerateInvalid = false): GeminiResponse {
+  return parseProviderJsonBody<GeminiResponse>("Gemini", bodyText, {
+    allowEmpty: tolerateInvalid,
+    tolerateInvalid
+  });
 }
 
 function extractInlineImage(part: GeminiInlineDataPart | undefined): {

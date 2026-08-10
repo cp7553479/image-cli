@@ -1,6 +1,5 @@
 import { describe, expect, test } from "vitest";
 
-import { normalizeSize } from "../../src/protocol/size.js";
 import { minimaxProviderPlugin } from "../../src/providers/minimax/index.js";
 import type { GenerateRequest } from "../../src/protocol/request.js";
 import type { ProviderGenerateContext } from "../../src/providers/types.js";
@@ -13,12 +12,14 @@ function makeContext(overrides: Partial<ProviderGenerateContext> = {}): Provider
       providerAlias: "minimax",
       modelId: "image-01"
     },
-    normalizedSize: normalizeSize("2k", "16:9"),
-    count: 2,
-    seed: 42,
+    size: "2048x1152",
+    n: 2,
+    quality: "high",
+    moderation: "low",
+    response_format: "b64_json",
+    output_format: "png",
+    user: "agent-1",
     extra: {
-      watermark: false,
-      response_format: "base64",
       prompt_optimizer: true
     }
   };
@@ -44,19 +45,6 @@ function makeContext(overrides: Partial<ProviderGenerateContext> = {}): Provider
       envName: "API_KEY",
       value: "secret-key"
     },
-    preparedImages: [
-      {
-        source: "https://example.com/reference.jpg",
-        kind: "url",
-        url: "https://example.com/reference.jpg"
-      },
-      {
-        source: "inline-1",
-        kind: "inline",
-        mimeType: "image/png",
-        base64Data: "aGVsbG8="
-      }
-    ],
     ...overrides
   };
 }
@@ -74,26 +62,18 @@ describe("MiniMax provider", () => {
       timeoutMs: 120_000
     });
     expect(operation.request.json).toEqual({
-      watermark: false,
       model: "image-01",
       prompt: "A portrait of a fox in a blue jacket",
-      response_format: "base64",
       prompt_optimizer: true,
+      quality: "high",
+      moderation: "low",
+      output_format: "png",
+      user: "agent-1",
+      response_format: "base64",
       aspect_ratio: "16:9",
-      width: 2848,
-      height: 1600,
-      seed: 42,
-      n: 2,
-      subject_reference: [
-        {
-          type: "character",
-          image_file: "https://example.com/reference.jpg"
-        },
-        {
-          type: "character",
-          image_file: "data:image/png;base64,aGVsbG8="
-        }
-      ]
+      width: 2048,
+      height: 1152,
+      n: 2
     });
   });
 
@@ -125,12 +105,12 @@ describe("MiniMax provider", () => {
     });
     expect(urlResult.images).toEqual([
       {
-        outputFormat: "url",
+        output_format: "url",
         url: "https://cdn.example.com/a.jpg",
         warnings: ["MiniMax image URLs expire after 24 hours. Download them promptly."]
       },
       {
-        outputFormat: "url",
+        output_format: "url",
         url: "https://cdn.example.com/b.jpg",
         warnings: ["MiniMax image URLs expire after 24 hours. Download them promptly."]
       }
@@ -152,24 +132,18 @@ describe("MiniMax provider", () => {
         stderrText: "",
         exitCode: 0
       },
-      {
-        ...makeContext(),
-        request: {
-          ...makeContext().request,
-          outputFormat: "png"
-        }
-      }
+      makeContext()
     );
 
     expect(base64Result.images).toEqual([
       {
-        outputFormat: "base64",
+        output_format: "base64",
         mimeType: "image/png",
         fileName: "minimax-1.png",
         dataBase64: "YmFzZTY0LWF"
       },
       {
-        outputFormat: "base64",
+        output_format: "base64",
         mimeType: "image/png",
         fileName: "minimax-2.png",
         dataBase64: "YmFzZTY0LWI="
@@ -231,41 +205,27 @@ describe("MiniMax provider", () => {
       kind: "non-retryable-request",
       reason: "MiniMax HTTP 400, base_resp.status_code=0"
     });
+  });
 
-    expect(
-      minimaxProviderPlugin.classifyFailure({
-        error: new Error("boom"),
-        response: {
-          statusCode: 200,
+  test("throws minimax http error bodies before parsing images", async () => {
+    await expect(
+      minimaxProviderPlugin.parseGenerateResponse(
+        {
+          statusCode: 400,
           headers: {},
           bodyText: JSON.stringify({
-            base_resp: { status_code: 1004, status_msg: "not authorized" }
+            base_resp: {
+              status_code: 1002,
+              status_msg: "invalid parameter"
+            }
           }),
           stderrText: "",
           exitCode: 0
-        }
-      })
-    ).toEqual({
-      kind: "retryable-credential",
-      reason: "MiniMax HTTP 200, base_resp.status_code=1004"
-    });
-
-    expect(
-      minimaxProviderPlugin.classifyFailure({
-        error: new Error("boom"),
-        response: {
-          statusCode: 200,
-          headers: {},
-          bodyText: JSON.stringify({
-            base_resp: { status_code: 1026, status_msg: "input new_sensitive" }
-          }),
-          stderrText: "",
-          exitCode: 0
-        }
-      })
-    ).toEqual({
-      kind: "non-retryable-request",
-      reason: "MiniMax HTTP 200, base_resp.status_code=1026"
-    });
+        },
+        makeContext()
+      )
+    ).rejects.toThrow(
+      /MiniMax request failed with HTTP 400: 1002: invalid parameter/
+    );
   });
 });

@@ -1,8 +1,6 @@
-import type { CanonicalProviderId } from "../protocol/types.js";
-
 export type ProviderCatalogEntry = {
-  providerId: CanonicalProviderId;
-  aliases: string[];
+  providerId: string;
+  aliases: readonly string[];
   defaultBaseUrl: string;
   description: string;
 };
@@ -10,7 +8,7 @@ export type ProviderCatalogEntry = {
 /**
  * PROVIDER_CATALOG 的导出入口。
  */
-export const PROVIDER_CATALOG: ProviderCatalogEntry[] = [
+export const PROVIDER_CATALOG = [
   {
     providerId: "openai",
     aliases: ["chatgpt-image"],
@@ -47,4 +45,6 @@ export const PROVIDER_CATALOG: ProviderCatalogEntry[] = [
     defaultBaseUrl: "https://api.minimax.io/v1",
     description: "MiniMax image generation"
   }
-];
+] as const satisfies readonly ProviderCatalogEntry[];
+
+export type BuiltInProviderId = (typeof PROVIDER_CATALOG)[number]["providerId"];

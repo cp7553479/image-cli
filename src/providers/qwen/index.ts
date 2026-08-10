@@ -6,13 +6,21 @@ import type {
 import type {
   FailureClassification,
   GenerateResult,
-  PreparedImageInput,
   ProviderErrorContext,
   ProviderGenerateContext,
   ProviderImageResult,
   ProviderOperation,
   ProviderPlugin
 } from "../types.js";
+import { getBuiltInProviderAliases } from "../identity.js";
+import {
+  collectOpenAIImageRequestFields,
+  qwenSizeFromOpenAIImageSize
+} from "../openai-image-options.js";
+import {
+  assertSuccessfulResponse,
+  parseJsonBody as parseProviderJsonBody
+} from "../response.js";
 
 /** Qwen API 默认基地址。用于拼接同步/异步端点。 */
 const DEFAULT_BASE_URL = "https://dashscope.aliyuncs.com/api/v1";
@@ -23,6 +31,7 @@ const ASYNC_HEADER_NAME = "X-DashScope-Async";
 const ASYNC_HEADER_VALUE = "enable";
 /** 异步任务最大轮询次数（次）。超过后视为超时失败。 */
 const MAX_POLL_ATTEMPTS = 30;
+const ASYNC_MODEL_IDS = new Set(["qwen-image", "qwen-image-plus"]);
 
 type QwenResponse = {
   usage?: Record<string, unknown>;
@@ -49,20 +58,18 @@ type QwenResponse = {
  */
 export const qwenProvider: ProviderPlugin = {
   providerId: "qwen",
-  aliases: ["qwen", "qwen-image", "qwen-image-plus"],
+  aliases: getBuiltInProviderAliases("qwen"),
   capabilities: {
     generate: true,
-    edit: true,
-    inputImages: true,
+    edit: false,
     asyncTasks: true,
     streaming: false,
     background: false,
-    negativePrompt: true,
     multipleOutputs: true,
     transparentOutput: false
   },
   async buildGenerateOperation(input: ProviderGenerateContext): Promise<ProviderOperation> {
-    const useAsync = shouldUseAsyncPath(input.request.model.modelId, input.preparedImages);
+    const useAsync = shouldUseAsyncPath(input.request.model.modelId);
     if (useAsync) {
       return buildAsyncOperation(input);
     }
@@ -72,7 +79,9 @@ export const qwenProvider: ProviderPlugin = {
     result: CurlExecutionResult,
     input: ProviderGenerateContext
   ): Promise<GenerateResult> {
-    const payload = parseJsonResponse(result.bodyText);
+    const payload = parseJsonResponse(result.bodyText, result.statusCode >= 400);
+    assertSuccessfulResponse("Qwen", result, payload);
+
     const images = extractImages(payload);
 
     return {
@@ -127,7 +136,7 @@ function buildSyncOperation(input: ProviderGenerateContext): ProviderOperation {
           messages: [
             {
               role: "user",
-              content: buildSyncContent(input.request, input.preparedImages)
+              content: buildSyncContent(input.request)
             }
           ]
         },
@@ -156,7 +165,12 @@ function buildAsyncOperation(input: ProviderGenerateContext): ProviderOperation 
       timeoutMs: input.providerConfig.timeoutMs
     },
     followUp: async (initialResult, tools) => {
-      const initialPayload = parseJsonResponse(initialResult.bodyText);
+      const initialPayload = parseJsonResponse(
+        initialResult.bodyText,
+        initialResult.statusCode >= 400
+      );
+      assertSuccessfulResponse("Qwen", initialResult, initialPayload);
+
       const taskId = initialPayload.output?.task_id?.trim();
       if (!taskId) {
         throw new Error("Qwen async response did not include a task_id.");
@@ -164,7 +178,12 @@ function buildAsyncOperation(input: ProviderGenerateContext): ProviderOperation 
 
       let currentResult = initialResult;
       for (let attempt = 0; attempt < MAX_POLL_ATTEMPTS; attempt++) {
-        const currentPayload = parseJsonResponse(currentResult.bodyText);
+        const currentPayload = parseJsonResponse(
+          currentResult.bodyText,
+          currentResult.statusCode >= 400
+        );
+        assertSuccessfulResponse("Qwen", currentResult, currentPayload);
+
         const taskStatus = currentPayload.output?.task_status?.trim();
 
         if (taskStatus === "SUCCEEDED") {
@@ -217,64 +236,39 @@ function buildAuthHeaders(apiKey: string): Record<string, string> {
   };
 }
 
-function buildSyncContent(
-  request: GenerateRequest,
-  preparedImages: PreparedImageInput[]
-): Array<Record<string, unknown>> {
-  const content: Array<Record<string, unknown>> = [{ text: request.prompt }];
-
-  for (const image of preparedImages) {
-    content.push({
-      image: image.kind === "inline" ? toDataUri(image.mimeType, image.base64Data) : image.url
-    });
-  }
-
-  return content;
+function buildSyncContent(request: GenerateRequest): Array<Record<string, unknown>> {
+  return [{ text: request.prompt }];
 }
 
 function buildParameters(request: GenerateRequest): Record<string, unknown> {
-  const parameters: Record<string, unknown> = {};
+  const parameters: Record<string, unknown> = {
+    ...(request.extra ?? {}),
+    ...collectOpenAIImageRequestFields(request, {
+      includeSize: false
+    })
+  };
 
-  if (request.normalizedSize) {
-    parameters.size = `${request.normalizedSize.width}*${request.normalizedSize.height}`;
-  } else if (request.size) {
-    parameters.size = request.size;
+  const size = qwenSizeFromOpenAIImageSize(request.size);
+  if (size) {
+    parameters.size = size;
   }
 
-  if (typeof request.count === "number") {
-    parameters.n = request.count;
-  }
-
-  if (request.negativePrompt) {
-    parameters.negative_prompt = request.negativePrompt;
-  }
-
-  if (typeof request.seed === "number") {
-    parameters.seed = request.seed;
-  }
-
-  if (request.extra) {
-    Object.assign(parameters, request.extra);
+  if (typeof request.n === "number") {
+    parameters.n = request.n;
   }
 
   return parameters;
 }
 
-function shouldUseAsyncPath(modelId: string, preparedImages: PreparedImageInput[]): boolean {
-  if (preparedImages.length > 0) {
-    return false;
-  }
-
-  return modelId.startsWith("qwen-image") || modelId.startsWith("qwen-image-plus");
+function shouldUseAsyncPath(modelId: string): boolean {
+  return ASYNC_MODEL_IDS.has(modelId);
 }
 
-function parseJsonResponse(bodyText: string): QwenResponse {
-  try {
-    return JSON.parse(bodyText) as QwenResponse;
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`Failed to parse Qwen response JSON. ${message}`);
-  }
+function parseJsonResponse(bodyText: string, tolerateInvalid = false): QwenResponse {
+  return parseProviderJsonBody<QwenResponse>("Qwen", bodyText, {
+    allowEmpty: tolerateInvalid,
+    tolerateInvalid
+  });
 }
 
 function extractImages(payload: QwenResponse): ProviderImageResult[] {
@@ -312,10 +306,6 @@ function normalizeBaseUrl(value: string): string {
     return DEFAULT_BASE_URL;
   }
   return trimmed.endsWith("/") ? trimmed.slice(0, -1) : trimmed;
-}
-
-function toDataUri(mimeType: string, base64Data: string): string {
-  return `data:${mimeType};base64,${base64Data}`;
 }
 
 export default qwenProvider;

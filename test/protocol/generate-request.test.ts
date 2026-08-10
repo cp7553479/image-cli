@@ -3,39 +3,47 @@ import { describe, expect, test } from "vitest";
 import { buildGenerateRequest } from "../../src/protocol/generate-request.js";
 
 describe("generate request building", () => {
-  test("normalizes CLI-style options into a generate request", () => {
+  test("maps OpenAI-compatible image options into a generate request", () => {
     const request = buildGenerateRequest("A poster of a cat", {
       model: "nano-banana/gemini-3.1-flash-image-preview",
-      size: "2k",
-      aspect: "16:9",
+      size: "1536x1024",
       n: "2",
-      image: ["./input.png", "https://example.com/ref.png"],
       quality: "high",
-      format: "png",
+      output_format: "png",
       background: "transparent",
-      seed: "7",
+      output_compression: "70",
+      moderation: "low",
+      response_format: "b64_json",
       stream: true,
+      partial_images: "0",
+      style: "natural",
+      user: "agent-1",
+      extra: '{"watermark":false}',
       outputDir: "./out",
-      json: true,
-      extra: '{"watermark":false}'
+      json: true
     });
 
-    expect(request.prompt).toBe("A poster of a cat");
-    expect(request.model.providerId).toBe("gemini");
-    expect(request.normalizedSize).toMatchObject({
-      width: 2848,
-      height: 1600,
-      aspectRatio: "16:9"
+    expect(request).toMatchObject({
+      prompt: "A poster of a cat",
+      size: "1536x1024",
+      n: 2,
+      quality: "high",
+      output_format: "png",
+      background: "transparent",
+      output_compression: 70,
+      moderation: "low",
+      response_format: "b64_json",
+      stream: true,
+      partial_images: 0,
+      style: "natural",
+      user: "agent-1",
+      extra: {
+        watermark: false
+      },
+      outputDir: "./out",
+      json: true
     });
-    expect(request.count).toBe(2);
-    expect(request.images).toEqual(["./input.png", "https://example.com/ref.png"]);
-    expect(request.outputFormat).toBe("png");
-    expect(request.background).toBe("transparent");
-    expect(request.seed).toBe(7);
-    expect(request.stream).toBe(true);
-    expect(request.outputDir).toBe("./out");
-    expect(request.json).toBe(true);
-    expect(request.extra).toEqual({ watermark: false });
+    expect(request.model.providerId).toBe("gemini");
   });
 
   test("requires a model reference", () => {
@@ -72,17 +80,70 @@ describe("generate request building", () => {
     expect(() =>
       buildGenerateRequest("prompt", {
         model: "openai/chatgpt-image-latest",
-        seed: "abc"
+        output_compression: "101"
       })
-    ).toThrow(/--seed/i);
-  });
-
-  test("rejects reserved extra key overrides", () => {
+    ).toThrow(/--output-compression/i);
     expect(() =>
       buildGenerateRequest("prompt", {
         model: "openai/chatgpt-image-latest",
-        extra: '{"prompt":"override"}'
+        partial_images: "4"
       })
-    ).toThrow(/reserved/i);
+    ).toThrow(/--partial-images/i);
+  });
+
+  test("rejects unsupported enum flags", () => {
+    expect(() =>
+      buildGenerateRequest("prompt", {
+        model: "openai/chatgpt-image-latest",
+        size: "2k"
+      })
+    ).toThrow(/--size/i);
+    expect(() =>
+      buildGenerateRequest("prompt", {
+        model: "openai/chatgpt-image-latest",
+        output_format: "gif"
+      })
+    ).toThrow(/--output-format/i);
+    expect(() =>
+      buildGenerateRequest("prompt", {
+        model: "openai/chatgpt-image-latest",
+      response_format: "base64"
+    })
+  ).toThrow(/--response-format/i);
+  });
+
+  test("parses provider-specific extra JSON and rejects overrides", () => {
+    const request = buildGenerateRequest("prompt", {
+      model: "seedream/doubao-seedream-4.5",
+      extra: '{"watermark":false,"optimize_prompt_options":{"mode":"standard"}}'
+    });
+
+    expect(request.extra).toEqual({
+      watermark: false,
+      optimize_prompt_options: {
+        mode: "standard"
+      }
+    });
+
+    expect(() =>
+      buildGenerateRequest("prompt", {
+        model: "openai/gpt-image-1.5",
+        extra: '{"model":"other"}'
+      })
+    ).toThrow(/must not override/i);
+
+    expect(() =>
+      buildGenerateRequest("prompt", {
+        model: "openai/gpt-image-1.5",
+        extra: "[]"
+      })
+    ).toThrow(/JSON object/i);
+
+    expect(() =>
+      buildGenerateRequest("prompt", {
+        model: "openai/gpt-image-1.5",
+        extra: "{bad"
+      })
+    ).toThrow(/valid JSON object/i);
   });
 });

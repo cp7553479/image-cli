@@ -1,50 +1,19 @@
-import type { CanonicalProviderId, ModelRef } from "./types.js";
+import {
+  listBuiltInProviderIds,
+  resolveProviderAlias as resolveProviderIdentityAlias
+} from "../providers/identity.js";
+import type { ModelRef } from "./types.js";
 
 /**
  * CANONICAL_PROVIDER_IDS 的导出入口。
  */
-export const CANONICAL_PROVIDER_IDS: CanonicalProviderId[] = [
-  "openai",
-  "openrouter",
-  "gemini",
-  "seedream",
-  "qwen",
-  "minimax"
-];
-
-const PROVIDER_ALIAS_MAP: Record<string, CanonicalProviderId> = {
-  openai: "openai",
-  "chatgpt-image": "openai",
-  openrouter: "openrouter",
-  "openrouter-image": "openrouter",
-  gemini: "gemini",
-  "nano-banana": "gemini",
-  seedream: "seedream",
-  qwen: "qwen",
-  "qwen-image": "qwen",
-  minimax: "minimax",
-  "minimax-image": "minimax"
-};
-
-const CUSTOM_PROVIDER_PATTERN = /^[a-z0-9][a-z0-9_-]*$/i;
+export const CANONICAL_PROVIDER_IDS = listBuiltInProviderIds();
 
 /**
  * resolveProviderAlias 的导出入口。
  */
 export function resolveProviderAlias(value: string): string {
-  const normalized = value.trim().toLowerCase();
-  const providerId = PROVIDER_ALIAS_MAP[normalized];
-  if (providerId) {
-    return providerId;
-  }
-
-  if (CUSTOM_PROVIDER_PATTERN.test(normalized)) {
-    return normalized;
-  }
-
-  throw new Error(
-    `Unknown provider "${value}". Expected one of: ${Object.keys(PROVIDER_ALIAS_MAP).join(", ")} or a custom provider id.`
-  );
+  return resolveProviderIdentityAlias(value);
 }
 
 /**

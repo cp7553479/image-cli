@@ -6,6 +6,9 @@ import type {
   ProviderPlugin
 } from "../types.js";
 import type { CurlExecutionResult } from "../../transport/curl.js";
+import { getBuiltInProviderAliases } from "../identity.js";
+import { collectOpenAIImageRequestFields } from "../openai-image-options.js";
+import { assertSuccessfulResponse } from "../response.js";
 
 const DEFAULT_BASE_URL = "https://ark.cn-beijing.volces.com/api/v3";
 const TEMPORARY_URL_WARNING = "Temporary URL; expires in 24 hours.";
@@ -15,21 +18,18 @@ const TEMPORARY_URL_WARNING = "Temporary URL; expires in 24 hours.";
  */
 export const seedreamProviderPlugin: ProviderPlugin = {
   providerId: "seedream",
-  aliases: ["seedream", "doubao-seedream", "doubao-seedream-4.0", "doubao-seedream-4.5"],
+  aliases: getBuiltInProviderAliases("seedream"),
   capabilities: {
     generate: true,
     edit: false,
-    inputImages: true,
     asyncTasks: false,
     streaming: true,
     background: false,
-    negativePrompt: false,
     multipleOutputs: true,
     transparentOutput: false
   },
   async buildGenerateOperation(input: ProviderGenerateContext): Promise<ProviderOperation> {
-    const extra = normalizeExtra(input.request.extra);
-    const requestBody = buildRequestBody(input, extra);
+    const requestBody = buildRequestBody(input);
 
     return {
       request: {
@@ -48,12 +48,10 @@ export const seedreamProviderPlugin: ProviderPlugin = {
     result: CurlExecutionResult,
     input: ProviderGenerateContext
   ) {
-    const payload = parsePayload(result.bodyText);
-    const items = extractResponseItems(payload);
+    const payload = parsePayload(result.bodyText, result.statusCode >= 400);
+    assertSuccessfulResponse("Seedream", result, payload);
 
-    if (result.statusCode < 200 || result.statusCode >= 300) {
-      throw new Error(buildFailureMessage(result, payload));
-    }
+    const items = extractResponseItems(payload);
 
     const images = items.map(mapImageResult).filter(isPresent);
     const warnings = unique(
@@ -108,78 +106,46 @@ export const seedreamProviderPlugin: ProviderPlugin = {
   }
 };
 
-function buildRequestBody(
-  input: ProviderGenerateContext,
-  extra: Record<string, unknown>
-): Record<string, unknown> {
+function buildRequestBody(input: ProviderGenerateContext): Record<string, unknown> {
   const body: Record<string, unknown> = {
-    model: input.request.model.modelId,
-    prompt: input.request.prompt
+    watermark: false,
+    ...(input.request.extra ?? {}),
+    ...collectOpenAIImageRequestFields(input.request, {
+      includeModelAndPrompt: true
+    })
   };
 
-  if (input.request.size) {
-    body.size = input.request.size;
+  body.response_format = input.request.response_format ?? "url";
+
+  if (input.request.stream) {
+    body.stream = true;
   }
 
-  const responseFormat = readString(extra.response_format) ?? "url";
-  body.response_format = responseFormat;
-
-  const stream = readBoolean(extra.stream) ?? input.request.stream ?? false;
-  body.stream = stream;
-
-  const watermark = readBoolean(extra.watermark);
-  body.watermark = watermark ?? true;
-
-  const referenceImages = prepareReferenceImages(input.preparedImages);
-  if (referenceImages.length > 0) {
-    body.reference_images = referenceImages;
-  }
-
-  const sequentialMode = readString(extra.sequential_image_generation);
-  const sequentialOptions = readObject(extra.sequential_image_generation_options);
-  if (input.request.count && input.request.count > 1) {
+  if (input.request.n && input.request.n > 1) {
     body.sequential_image_generation = "auto";
     body.sequential_image_generation_options = {
-      ...(sequentialOptions ?? {}),
-      max_images: input.request.count
+      max_images: input.request.n
     };
-  } else if (sequentialMode || sequentialOptions) {
-    if (sequentialMode) {
-      body.sequential_image_generation = sequentialMode;
-    }
-    if (sequentialOptions) {
-      body.sequential_image_generation_options = sequentialOptions;
-    }
-  }
-
-  const optimizePromptOptions = readObject(extra.optimize_prompt_options);
-  if (optimizePromptOptions) {
-    body.optimize_prompt_options = optimizePromptOptions;
   }
 
   return body;
 }
 
-function prepareReferenceImages(
-  preparedImages: ProviderGenerateContext["preparedImages"]
-): string[] {
-  return preparedImages.map((image) => {
-    if (image.kind === "url") {
-      return image.url;
-    }
-
-    return `data:${image.mimeType};base64,${image.base64Data}`;
-  });
-}
-
-function parsePayload(bodyText: string): unknown {
+function parsePayload(bodyText: string, tolerateInvalid = false): unknown {
   const trimmed = bodyText.trim();
   if (!trimmed) {
     return {};
   }
 
   if (!trimmed.startsWith("data:")) {
-    return JSON.parse(trimmed) as unknown;
+    try {
+      return JSON.parse(trimmed) as unknown;
+    } catch (error) {
+      if (tolerateInvalid) {
+        return {};
+      }
+      throw error;
+    }
   }
 
   const lines = trimmed.split(/\r?\n/);
@@ -194,7 +160,14 @@ function parsePayload(bodyText: string): unknown {
   }
 
   const lastDataLine = dataLines.at(-1) ?? "{}";
-  return JSON.parse(lastDataLine) as unknown;
+  try {
+    return JSON.parse(lastDataLine) as unknown;
+  } catch (error) {
+    if (tolerateInvalid) {
+      return {};
+    }
+    throw error;
+  }
 }
 
 function extractResponseItems(payload: unknown): unknown[] {
@@ -236,14 +209,14 @@ function mapImageResult(item: unknown): ProviderImageResult | null {
     if (item.startsWith("data:")) {
       const parsed = parseDataUrl(item);
       return {
-        outputFormat: "b64_json",
+        output_format: "b64_json",
         mimeType: parsed.mimeType,
         dataBase64: parsed.base64Data
       };
     }
 
     return {
-      outputFormat: "url",
+      output_format: "url",
       url: item,
       warnings: [TEMPORARY_URL_WARNING]
     };
@@ -257,7 +230,7 @@ function mapImageResult(item: unknown): ProviderImageResult | null {
   const url = readString(record.url);
   if (url) {
     return {
-      outputFormat: "url",
+      output_format: "url",
       url,
       warnings: [TEMPORARY_URL_WARNING]
     };
@@ -269,7 +242,7 @@ function mapImageResult(item: unknown): ProviderImageResult | null {
     readString(record.b64Json);
   if (base64Data) {
     return {
-      outputFormat: "b64_json",
+      output_format: "b64_json",
       mimeType: readString(record.mime_type) ?? readString(record.mimeType),
       dataBase64: base64Data
     };
@@ -279,7 +252,7 @@ function mapImageResult(item: unknown): ProviderImageResult | null {
   if (dataUrl) {
     const parsed = parseDataUrl(dataUrl);
     return {
-      outputFormat: "b64_json",
+      output_format: "b64_json",
       mimeType: parsed.mimeType,
       dataBase64: parsed.base64Data
     };
@@ -316,29 +289,6 @@ function extractUsage(payload: unknown): Record<string, unknown> | undefined {
   return usage as Record<string, unknown>;
 }
 
-function buildFailureMessage(result: CurlExecutionResult, payload: unknown): string {
-  const responseMessage = extractResponseMessage(payload);
-  if (responseMessage) {
-    return `Seedream request failed with HTTP ${result.statusCode}: ${responseMessage}`;
-  }
-
-  return `Seedream request failed with HTTP ${result.statusCode}.`;
-}
-
-function extractResponseMessage(payload: unknown): string | undefined {
-  if (!payload || typeof payload !== "object") {
-    return undefined;
-  }
-
-  const record = payload as Record<string, unknown>;
-  return (
-    readString(record.message) ??
-    readString(record.error) ??
-    readString(record.detail) ??
-    readString(record.msg)
-  );
-}
-
 function extractErrorMessage(error: unknown): string {
   if (error instanceof Error) {
     return error.message;
@@ -347,24 +297,8 @@ function extractErrorMessage(error: unknown): string {
   return typeof error === "string" ? error : "";
 }
 
-function normalizeExtra(extra: Record<string, unknown> | undefined): Record<string, unknown> {
-  return extra ?? {};
-}
-
 function readString(value: unknown): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : undefined;
-}
-
-function readBoolean(value: unknown): boolean | undefined {
-  return typeof value === "boolean" ? value : undefined;
-}
-
-function readObject(value: unknown): Record<string, unknown> | undefined {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return undefined;
-  }
-
-  return value as Record<string, unknown>;
 }
 
 function unique(values: string[]): string[] {

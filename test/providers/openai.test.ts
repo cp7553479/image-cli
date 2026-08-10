@@ -7,24 +7,20 @@ describe("openai provider", () => {
   test("maps generate requests to the images generations endpoint", async () => {
     const context = makeContext({
       prompt: "a red fox",
-      count: 2,
-      size: "2k",
-      normalizedSize: {
-        source: "preset",
-        preset: "2k",
-        width: 2048,
-        height: 2048,
-        aspectRatio: "1:1",
-        raw: "2k"
-      },
+      n: 2,
+      size: "1536x1024",
       quality: "high",
       background: "transparent",
-      outputFormat: "webp",
+      output_format: "webp",
+      output_compression: 70,
+      moderation: "low",
+      response_format: "b64_json",
       stream: true,
+      partial_images: 2,
+      style: "natural",
+      user: "alice",
       extra: {
-        user: "alice",
-        moderation: "low",
-        output_compression: 70
+        vendor_flag: true
       }
     });
 
@@ -37,31 +33,25 @@ describe("openai provider", () => {
         Authorization: "Bearer sk-test"
       },
       json: {
+        vendor_flag: true,
         model: "gpt-image-1",
         prompt: "a red fox",
         n: 2,
-        size: "2048x2048",
+        size: "1536x1024",
         quality: "high",
         background: "transparent",
         output_format: "webp",
         output_compression: 70,
+        moderation: "low",
+        response_format: "b64_json",
         stream: true,
-        user: "alice",
-        moderation: "low"
+        partial_images: 2,
+        style: "natural",
+        user: "alice"
       },
       timeoutMs: 120000,
       stream: true
     });
-  });
-
-  test("rejects image inputs for generate", async () => {
-    await expect(
-      openaiProviderPlugin.buildGenerateOperation(
-        makeContext({
-          images: ["data:image/png;base64,abc"]
-        })
-      )
-    ).rejects.toThrow(/does not accept images/i);
   });
 
   test("parses base64 and url image results", async () => {
@@ -95,16 +85,68 @@ describe("openai provider", () => {
     expect(result.images).toEqual([
       {
         dataBase64: "Zm9v",
-        outputFormat: "png",
+        output_format: "png",
         mimeType: "image/png"
       },
       {
         url: "https://example.com/temp.png",
         warnings: [expect.stringMatching(/temporary url/i)],
-        outputFormat: "png",
+        output_format: "png",
         mimeType: "image/png"
       }
     ]);
+  });
+
+  test("parses streamed image events", async () => {
+    const result = await openaiProviderPlugin.parseGenerateResponse(
+      {
+        statusCode: 200,
+        headers: {},
+        bodyText: [
+          'event: image_generation.partial_image',
+          'data: {"type":"image_generation.partial_image","b64_json":"cGFydGlhbA==","partial_image_index":0}',
+          "",
+          'event: image_generation.completed',
+          'data: {"type":"image_generation.completed","b64_json":"ZmluYWw="}',
+          "",
+          'data: [DONE]'
+        ].join("\n"),
+        stderrText: "",
+        exitCode: 0
+      },
+      makeContext({
+        stream: true,
+        output_format: "webp"
+      })
+    );
+
+    expect(result.images).toEqual([
+      {
+        dataBase64: "ZmluYWw=",
+        output_format: "webp",
+        mimeType: "image/webp"
+      }
+    ]);
+  });
+
+  test("throws provider error responses instead of returning empty images", async () => {
+    await expect(
+      openaiProviderPlugin.parseGenerateResponse(
+        {
+          statusCode: 400,
+          headers: {},
+          bodyText: JSON.stringify({
+            error: {
+              code: "invalid_request_error",
+              message: "Unknown parameter"
+            }
+          }),
+          stderrText: "",
+          exitCode: 0
+        },
+        makeContext()
+      )
+    ).rejects.toThrow(/OpenAI request failed with HTTP 400: invalid_request_error: Unknown parameter/);
   });
 
   test("classifies retryability from openai status codes", () => {
@@ -154,7 +196,6 @@ function makeContext(
     credential: {
       envName: "API_KEY",
       value: "sk-test"
-    },
-    preparedImages: overrides.images ? [{ source: "test", kind: "url", url: overrides.images[0] }] : []
+    }
   };
 }

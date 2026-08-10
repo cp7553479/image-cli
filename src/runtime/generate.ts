@@ -6,19 +6,13 @@ import type { GenerateRequest } from "../protocol/request.js";
 import type { CurlExecutionResult, CurlRequest } from "../transport/curl.js";
 import { executeCurlRequest } from "../transport/curl.js";
 import { getProviderPlugin } from "../providers/index.js";
-import type {
-  GenerateResult,
-  PreparedImageInput,
-  ProviderPlugin
-} from "../providers/types.js";
-import { prepareImageInputs } from "./images.js";
+import type { GenerateResult, ProviderPlugin } from "../providers/types.js";
 import { writeGenerateArtifacts, type OutputManifest } from "./output.js";
 
 type ExecuteGenerateWithFailoverOptions = {
   plugin: ProviderPlugin;
   providerConfig: ResolvedProviderConfig;
   request: GenerateRequest;
-  preparedImages: PreparedImageInput[];
   execute: (request: CurlRequest) => Promise<CurlExecutionResult>;
 };
 
@@ -33,6 +27,7 @@ export async function executeGenerateWithFailover(
 ): Promise<GenerateResult> {
   let lastError: unknown;
 
+  // See docs/error-handling.md#credential-failover for retry boundaries.
   for (const credential of options.providerConfig.credentials) {
     let response: CurlExecutionResult | undefined;
 
@@ -40,8 +35,7 @@ export async function executeGenerateWithFailover(
       const operation = await options.plugin.buildGenerateOperation({
         request: options.request,
         providerConfig: options.providerConfig,
-        credential,
-        preparedImages: options.preparedImages
+        credential
       });
       response = await options.execute(operation.request);
 
@@ -56,8 +50,7 @@ export async function executeGenerateWithFailover(
       return await options.plugin.parseGenerateResponse(response, {
         request: options.request,
         providerConfig: options.providerConfig,
-        credential,
-        preparedImages: options.preparedImages
+        credential
       });
     } catch (error) {
       lastError = error;
@@ -112,12 +105,10 @@ export async function runGenerateRequest(
     );
   }
 
-  const preparedImages = await prepareImageInputs(request.images ?? []);
   const result = await executeGenerateWithFailover({
     plugin: providerPlugin,
     providerConfig,
     request,
-    preparedImages,
     execute: executeCurlRequest
   });
 

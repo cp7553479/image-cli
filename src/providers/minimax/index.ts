@@ -6,30 +6,33 @@ import type { CurlExecutionResult, CurlRequest } from "../../transport/curl.js";
 import type {
   FailureClassification,
   GenerateResult,
-  PreparedImageInput,
   ProviderErrorContext,
   ProviderGenerateContext,
   ProviderImageResult,
   ProviderOperation,
   ProviderPlugin
 } from "../types.js";
+import { getBuiltInProviderAliases } from "../identity.js";
+import {
+  aspectRatioFromOpenAIImageSize,
+  collectOpenAIImageRequestFields,
+  parseOpenAIImageSize
+} from "../openai-image-options.js";
+import { assertSuccessfulResponse } from "../response.js";
 
 const MINIMAX_API_BASE_URL = "https://api.minimax.io/v1";
 const TEMPORARY_URL_WARNING =
   "MiniMax image URLs expire after 24 hours. Download them promptly.";
 const DEFAULT_RESPONSE_FORMAT = "url";
-const DEFAULT_PROMPT_OPTIMIZER = false;
 
 const RETRYABLE_CREDENTIAL_CODES = new Set([401, 403, 429, 1004, 1008, 2049]);
 
 const CAPABILITIES: ProviderCapabilities = {
   generate: true,
-  edit: true,
-  inputImages: true,
+  edit: false,
   asyncTasks: false,
   streaming: false,
   background: false,
-  negativePrompt: false,
   multipleOutputs: true,
   transparentOutput: false
 };
@@ -39,7 +42,7 @@ const CAPABILITIES: ProviderCapabilities = {
  */
 export const minimaxProviderPlugin: ProviderPlugin = {
   providerId: "minimax",
-  aliases: ["minimax", "minimax-image"],
+  aliases: getBuiltInProviderAliases("minimax"),
   capabilities: CAPABILITIES,
   async buildGenerateOperation(input: ProviderGenerateContext): Promise<ProviderOperation> {
     return {
@@ -50,23 +53,21 @@ export const minimaxProviderPlugin: ProviderPlugin = {
     result: CurlExecutionResult,
     input: ProviderGenerateContext
   ): Promise<GenerateResult> {
-    const body = parseJsonBody(result.bodyText);
+    const body = parseJsonBody(result.bodyText, result.statusCode >= 400);
+    assertSuccessfulResponse("MiniMax", result, body);
+
     const baseRespStatusCode = getNumber(
       body,
       ["base_resp", "status_code"],
       getNumber(body, ["status_code"])
     );
-    const images = parseImages(body, input.request, input.preparedImages);
+    const images = parseImages(body, input.request);
     const warnings = [...new Set(images.flatMap((image) => image.warnings ?? []))];
 
     if (baseRespStatusCode && baseRespStatusCode !== 0) {
       throw new Error(
         `MiniMax request failed with base_resp.status_code=${baseRespStatusCode}.`
       );
-    }
-
-    if (result.statusCode >= 400) {
-      throw new Error(`MiniMax request failed with HTTP ${result.statusCode}.`);
     }
 
     return {
@@ -126,7 +127,7 @@ export const minimaxProviderPlugin: ProviderPlugin = {
  */
 export function buildGenerateRequest(input: ProviderGenerateContext): CurlRequest {
   const baseUrl = input.providerConfig.apiBaseUrl || MINIMAX_API_BASE_URL;
-  const payload = buildRequestPayload(input.request, input.preparedImages);
+  const payload = buildRequestPayload(input.request);
 
   return {
     method: "POST",
@@ -143,59 +144,30 @@ export function buildGenerateRequest(input: ProviderGenerateContext): CurlReques
  * buildRequestPayload 的导出入口。
  */
 export function buildRequestPayload(
-  request: GenerateRequest,
-  preparedImages: PreparedImageInput[]
+  request: GenerateRequest
 ): Record<string, unknown> {
   const payload: Record<string, unknown> = {
-    model: request.model.modelId,
-    prompt: request.prompt,
-    response_format: resolveResponseFormat(request.extra),
-    prompt_optimizer: resolvePromptOptimizer(request.extra)
+    ...(request.extra ?? {}),
+    ...collectOpenAIImageRequestFields(request, {
+      includeModelAndPrompt: true,
+      includeSize: false
+    }),
+    response_format: resolveResponseFormat(request.response_format)
   };
 
-  const normalizedSize = request.normalizedSize;
-  if (normalizedSize) {
-    payload.aspect_ratio = normalizedSize.aspectRatio;
-    payload.width = normalizedSize.width;
-    payload.height = normalizedSize.height;
-  } else if (request.aspectRatio) {
-    payload.aspect_ratio = request.aspectRatio;
+  const dimensions = parseOpenAIImageSize(request.size);
+  const aspectRatio = aspectRatioFromOpenAIImageSize(request.size);
+  if (dimensions && aspectRatio) {
+    payload.aspect_ratio = aspectRatio;
+    payload.width = dimensions.width;
+    payload.height = dimensions.height;
   }
 
-  if (typeof request.seed === "number") {
-    payload.seed = request.seed;
+  if (typeof request.n === "number") {
+    payload.n = request.n;
   }
 
-  if (typeof request.count === "number") {
-    payload.n = request.count;
-  }
-
-  const subjectReference = buildSubjectReference(preparedImages);
-  if (subjectReference.length > 0) {
-    payload.subject_reference = subjectReference;
-  }
-
-  const passthroughExtra = filterExtraFields(request.extra);
-  return {
-    ...passthroughExtra,
-    ...payload
-  };
-}
-
-/**
- * buildSubjectReference 的导出入口。
- */
-export function buildSubjectReference(preparedImages: PreparedImageInput[]): Array<{
-  type: "character";
-  image_file: string;
-}> {
-  return preparedImages.map((image) => ({
-    type: "character",
-    image_file:
-      image.kind === "url"
-        ? image.url
-        : `data:${image.mimeType};base64,${image.base64Data}`
-  }));
+  return payload;
 }
 
 /**
@@ -209,7 +181,7 @@ export function parseGenerateResultImages(
   const urlOutputs = getStringArray(data, ["image_urls"]);
   if (urlOutputs.length > 0) {
     return urlOutputs.map((url) => ({
-      outputFormat: "url",
+      output_format: "url",
       url,
       warnings: [TEMPORARY_URL_WARNING]
     }));
@@ -218,9 +190,9 @@ export function parseGenerateResultImages(
   const base64Outputs = getStringArray(data, ["image_base64"]);
   if (base64Outputs.length > 0) {
     return base64Outputs.map((base64Data, index) => ({
-      outputFormat: "base64",
-      mimeType: inferMimeType(request.outputFormat),
-      fileName: buildFileName(index, request.outputFormat),
+      output_format: "base64",
+      mimeType: inferMimeType(request.output_format),
+      fileName: buildFileName(index, request.output_format),
       dataBase64: base64Data
     }));
   }
@@ -233,54 +205,23 @@ export function parseGenerateResultImages(
  */
 export function parseImages(
   body: unknown,
-  request: GenerateRequest,
-  preparedImages: PreparedImageInput[]
+  request: GenerateRequest
 ): ProviderImageResult[] {
-  void preparedImages;
   return parseGenerateResultImages(body, request);
 }
 
-function resolveResponseFormat(extra?: Record<string, unknown>): string {
-  const value = extra?.response_format;
-  if (value === "url" || value === "base64") {
+function resolveResponseFormat(value?: GenerateRequest["response_format"]): string {
+  if (value === "b64_json") {
+    return "base64";
+  }
+  if (value === "url") {
     return value;
   }
   return DEFAULT_RESPONSE_FORMAT;
 }
 
-function resolvePromptOptimizer(extra?: Record<string, unknown>): boolean {
-  const value = extra?.prompt_optimizer;
-  if (typeof value === "boolean") {
-    return value;
-  }
-  return DEFAULT_PROMPT_OPTIMIZER;
-}
-
-function filterExtraFields(extra?: Record<string, unknown>): Record<string, unknown> {
-  if (!extra) {
-    return {};
-  }
-
-  const blockedKeys = new Set([
-    "model",
-    "prompt",
-    "aspect_ratio",
-    "width",
-    "height",
-    "response_format",
-    "prompt_optimizer",
-    "seed",
-    "n",
-    "subject_reference"
-  ]);
-
-  return Object.fromEntries(
-    Object.entries(extra).filter(([key]) => !blockedKeys.has(key))
-  );
-}
-
-function inferMimeType(outputFormat?: "png" | "jpeg" | "webp"): string {
-  switch (outputFormat) {
+function inferMimeType(output_format?: GenerateRequest["output_format"]): string {
+  switch (output_format) {
     case "png":
       return "image/png";
     case "webp":
@@ -291,11 +232,11 @@ function inferMimeType(outputFormat?: "png" | "jpeg" | "webp"): string {
   }
 }
 
-function buildFileName(index: number, outputFormat?: "png" | "jpeg" | "webp"): string {
+function buildFileName(index: number, output_format?: GenerateRequest["output_format"]): string {
   const extension =
-    outputFormat === "png"
+    output_format === "png"
       ? "png"
-      : outputFormat === "webp"
+      : output_format === "webp"
         ? "webp"
         : "jpeg";
   return `minimax-${index + 1}.${extension}`;

@@ -18,11 +18,9 @@ describe("runtime generate", () => {
       capabilities: {
         generate: true,
         edit: false,
-        inputImages: false,
         asyncTasks: false,
         streaming: false,
         background: false,
-        negativePrompt: false,
         multipleOutputs: false,
         transparentOutput: false
       },
@@ -41,7 +39,7 @@ describe("runtime generate", () => {
         return {
           providerId: "openai",
           modelId: "chatgpt-image-latest",
-          images: [{ dataBase64: "aGVsbG8=", outputFormat: "png", mimeType: "image/png" }],
+          images: [{ dataBase64: "aGVsbG8=", output_format: "png", mimeType: "image/png" }],
           warnings: [],
           raw: { ok: true }
         };
@@ -74,7 +72,6 @@ describe("runtime generate", () => {
           modelId: "chatgpt-image-latest"
         }
       },
-      preparedImages: [],
       execute: async () => {
         attempts += 1;
         if (attempts === 1) {
@@ -111,12 +108,12 @@ describe("runtime generate", () => {
         modelId: "image-01",
         images: [
           {
-            outputFormat: "png",
+            output_format: "png",
             mimeType: "image/png",
             dataBase64: "aGVsbG8="
           },
           {
-            outputFormat: "url",
+            output_format: "url",
             url: "https://example.com/generated.png",
             warnings: ["temporary url"]
           }
@@ -124,6 +121,16 @@ describe("runtime generate", () => {
         warnings: ["temporary url"],
         raw: {
           ok: true
+        },
+        usage: {
+          prompt_tokens: 12,
+          completion_tokens: 3,
+          prompt_tokens_details: {
+            cached_tokens: 5
+          },
+          completion_tokens_details: {
+            reasoning_tokens: 2
+          }
         }
       },
       downloadFile: async ({ destinationPath }) => {
@@ -133,11 +140,81 @@ describe("runtime generate", () => {
 
     expect(manifest.files).toHaveLength(2);
     expect(manifest.warnings).toContain("temporary url");
+    expect(manifest.usage).toEqual({
+      input_tokens: 12,
+      output_tokens: 3,
+      total_tokens: 15,
+      input_tokens_details: {
+        cached_tokens: 5
+      },
+      output_tokens_details: {
+        reasoning_tokens: 2
+      },
+      prompt_tokens: 12,
+      completion_tokens: 3,
+      prompt_tokens_details: {
+        cached_tokens: 5
+      },
+      completion_tokens_details: {
+        reasoning_tokens: 2
+      }
+    });
 
     const base64File = await readFile(manifest.files[0]!, "utf8");
     const downloadedFile = await readFile(manifest.files[1]!, "utf8");
+    const manifestFile = JSON.parse(await readFile(manifest.manifestPath, "utf8")) as {
+      usage: unknown;
+    };
     expect(base64File).toBe("hello");
     expect(downloadedFile).toBe("downloaded");
+    expect(manifestFile.usage).toEqual(manifest.usage);
+  });
+
+  test("normalizes responses usage naming for manifest output", async () => {
+    const outputDir = path.join(tmpdir(), `image-cli-output-${Date.now()}-responses`);
+    await mkdir(outputDir, { recursive: true });
+
+    const manifest = await writeGenerateArtifacts({
+      outputDir,
+      result: {
+        providerId: "openai",
+        modelId: "gpt-image-1",
+        images: [],
+        warnings: [],
+        raw: {},
+        usage: {
+          input_tokens: 20,
+          output_tokens: 8,
+          total_tokens: 28,
+          input_tokens_details: {
+            cached_tokens: 7
+          },
+          output_tokens_details: {
+            reasoning_tokens: 1
+          }
+        }
+      }
+    });
+
+    expect(manifest.usage).toEqual({
+      input_tokens: 20,
+      output_tokens: 8,
+      total_tokens: 28,
+      input_tokens_details: {
+        cached_tokens: 7
+      },
+      output_tokens_details: {
+        reasoning_tokens: 1
+      },
+      prompt_tokens: 20,
+      completion_tokens: 8,
+      prompt_tokens_details: {
+        cached_tokens: 7
+      },
+      completion_tokens_details: {
+        reasoning_tokens: 1
+      }
+    });
   });
 });
 

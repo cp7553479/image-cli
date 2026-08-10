@@ -2,9 +2,11 @@
 
 ## Goal
 
-Provide a single CLI, `image`, that gives agents a stable interface for image generation across multiple providers with unified configuration, unified semantics, and provider-specific extensibility.
+Provide one local CLI, `image`, for agent-driven image generation. The CLI
+accepts an OpenAI-compatible image generation request shape, routes it to a
+configured provider, saves artifacts, and prints compact output.
 
-v1 ships:
+v1 public commands:
 
 - `image generate`
 - `image config init`
@@ -12,49 +14,54 @@ v1 ships:
 - `image config show`
 - `image config doctor`
 - `image config providers`
-
-v1 does not expose `image edit`, but the protocol and plugin system reserve it.
+- `image provider list`
+- `image provider <provider-id> model list`
 
 ## Design Principles
 
-- Protocol layer owns user-facing semantics and validation.
-- Provider plugins own HTTP mapping and response parsing.
-- Secrets never live in JSON config.
-- `curl` is the transport boundary; no official provider SDKs.
-- The CLI must fail early on invalid normalized input before provider transport.
-- Provider-specific power is available through `--extra`, but `--extra` cannot override protocol-owned fields.
+- CLI protocol follows OpenAI image generation naming and request semantics.
+- Provider identity and API interface mapping are separate layers.
+- Protocol validation happens before provider transport.
+- Provider modules translate the protocol request to native HTTP requests.
+- Provider modules do not perform provider-specific option filtering; unsupported options are reported by provider responses.
+- Secrets never live in tracked files.
+- Runtime code uses Node built-ins and `curl`; published runtime dependencies stay at zero.
+- Default output is short enough for calling agents.
+- Provider diagnostics belong in explicit diagnostic paths, not default success output.
 
 ## CLI Grammar
-
-### Root
 
 ```bash
 image --help
 image generate <prompt> [options]
 image config <subcommand> [options]
+image provider <subcommand> [options]
+image provider <provider-id> model list [options]
 ```
 
-### Generate
+Generate:
 
 ```bash
 image generate "prompt" \
   --model provider_id/model_id \
-  [--size 2k|4k|WIDTHxHEIGHT] \
-  [--aspect 1:1|4:3|3:4|16:9|9:16|3:2|2:3|21:9] \
+  [--size auto|WIDTHxHEIGHT] \
   [--n COUNT] \
-  [--image PATH_OR_URL ...] \
   [--quality VALUE] \
-  [--format png|jpeg|webp] \
   [--background auto|opaque|transparent] \
-  [--negative-prompt TEXT] \
-  [--seed INTEGER] \
+  [--output-format png|jpeg|webp] \
+  [--output-compression 0-100] \
+  [--moderation auto|low] \
+  [--response-format url|b64_json] \
   [--stream] \
+  [--partial-images COUNT] \
+  [--style vivid|natural] \
+  [--user ID] \
+  [--extra JSON_OBJECT] \
   [--output-dir PATH] \
-  [--json] \
-  [--extra JSON_OBJECT]
+  [--json]
 ```
 
-### Config
+Config:
 
 ```bash
 image config init
@@ -64,111 +71,103 @@ image config doctor [--json]
 image config providers [--json]
 ```
 
-## Normalized Generate Request
+Provider inspection:
+
+```bash
+image provider list [--json]
+image provider <provider-id> model list [--json] [--limit COUNT]
+```
+
+## Help Standard
+
+- Running `image` without a subcommand prints concise root help plus the public operation guide, then exits non-zero.
+- Running a command group without a required subcommand prints only that group's local help and exits non-zero.
+- `-h` and `--help` print command help and exit zero.
+- Missing required arguments print a concise error plus the target command's help.
+- Help and guidance output is English.
+- Root help may list all public operations; subcommand help must not append root-only operation guides.
+- New public commands must update `SPEC.md`, README files, generated help, bundled skill docs, and CLI help tests.
+- Help text is maintained in `src/cli/help.ts`; command routing belongs in `src/cli/program.ts`.
+
+## Generate Request
 
 ```ts
 type GenerateRequest = {
   prompt: string;
   model: ModelRef;
-  size?: SizeInput;
-  normalizedSize?: NormalizedSize;
-  aspectRatio?: AspectRatio;
-  count?: number;
-  images?: ImageInput[];
+  size?: string;
+  n?: number;
   quality?: string;
-  outputFormat?: "png" | "jpeg" | "webp";
   background?: "auto" | "opaque" | "transparent";
-  negativePrompt?: string;
-  seed?: number;
+  output_format?: "png" | "jpeg" | "webp";
+  output_compression?: number;
+  moderation?: "auto" | "low";
+  response_format?: "url" | "b64_json";
   stream?: boolean;
+  partial_images?: number;
+  style?: "vivid" | "natural";
+  user?: string;
+  extra?: Record<string, unknown>;
   outputDir?: string;
   json?: boolean;
-  extra?: Record<string, unknown>;
 };
 ```
 
-Reserved for future:
+`extra` carries provider-specific options outside the OpenAI-compatible image
+fields. It must be a JSON object and must not override standard fields.
 
-```ts
-type EditRequest = {
-  model: ModelRef;
-  prompt: string;
-  images: ImageInput[];
-  mask?: ImageInput;
-  size?: SizeInput;
-  aspectRatio?: AspectRatio;
-  extra?: Record<string, unknown>;
-};
-```
+The protocol layer owns:
+
+- model reference parsing
+- enum validation
+- numeric validation
+- command help
+- conversion from CLI option spelling to request field spelling
+
+The provider layer owns:
+
+- provider authentication
+- URL construction
+- request body translation
+- forwarding standard OpenAI-compatible fields where the provider request surface can carry them
+- response parsing
+- failure classification
+- provider warnings
 
 ## Model Reference
 
 `--model` must parse as `provider_id/model_id`.
 
-Canonical provider IDs:
+Built-in provider ids:
 
 - `openai`
+- `openrouter`
 - `gemini`
 - `seedream`
 - `qwen`
 - `minimax`
 
-Accepted provider aliases:
+Built-in aliases:
 
 - `chatgpt-image` -> `openai`
+- `openrouter-image` -> `openrouter`
 - `nano-banana` -> `gemini`
+- `doubao-seedream` -> `seedream`
 - `qwen-image` -> `qwen`
 - `minimax-image` -> `minimax`
 
-Alias resolution only applies to the provider segment. The model segment is passed through unchanged.
+Provider ids and aliases are owned by provider catalog metadata. The protocol
+parser must not keep a separate built-in provider table.
 
-## Size Semantics
+## Size
 
-Accepted raw size forms:
+`--size` accepts:
 
-- semantic preset: `2k`, `4k`
-- explicit dimensions: `WIDTHxHEIGHT`
+- `auto`
+- explicit dimensions as `WIDTHxHEIGHT`
 
-Accepted aspect values:
-
-- `1:1`
-- `4:3`
-- `3:4`
-- `16:9`
-- `9:16`
-- `3:2`
-- `2:3`
-- `21:9`
-
-Normalization rules:
-
-- `WIDTHxHEIGHT` wins over preset-derived dimensions.
-- `--aspect` may refine preset sizes.
-- If `--size` is explicit dimensions and `--aspect` disagrees, fail before transport.
-- If a provider does not support the normalized result, the plugin returns a capability error with the provider name and supported values.
-
-Preset defaults:
-
-- `2k`:
-  - `1:1` -> `2048x2048`
-  - `4:3` -> `2304x1728`
-  - `3:4` -> `1728x2304`
-  - `16:9` -> `2848x1600`
-  - `9:16` -> `1600x2848`
-  - `3:2` -> `2496x1664`
-  - `2:3` -> `1664x2496`
-  - `21:9` -> `3136x1344`
-- `4k`:
-  - `1:1` -> `4096x4096`
-  - `4:3` -> `4096x3072`
-  - `3:4` -> `3072x4096`
-  - `16:9` -> `4096x2304`
-  - `9:16` -> `2304x4096`
-  - `3:2` -> `4096x2736`
-  - `2:3` -> `2736x4096`
-  - `21:9` -> `4096x1752`
-
-If a preset is provided without `--aspect`, default to `1:1`.
+The CLI does not derive dimensions from named presets. Providers that need
+native aspect or size buckets must derive them from `size` in provider code.
 
 ## Provider Capability Model
 
@@ -176,268 +175,109 @@ If a preset is provided without `--aspect`, default to `1:1`.
 type ProviderCapabilities = {
   generate: boolean;
   edit: boolean;
-  inputImages: boolean;
   asyncTasks: boolean;
   streaming: boolean;
   background: boolean;
-  negativePrompt: boolean;
   multipleOutputs: boolean;
   transparentOutput: boolean;
 };
 ```
 
-v1 capability expectations:
+v1 public command behavior:
 
-- OpenAI: generate yes, edit yes, input images yes, async tasks no, streaming yes
-- Gemini: generate yes, edit yes, input images yes, async tasks yes via batch only, streaming no for v1 transport
-- Seedream: generate yes, edit model family yes, input images yes, async tasks no, streaming yes
-- Qwen: generate yes, edit yes, input images yes, async tasks yes
-- MiniMax: generate yes, edit via same endpoint surface, input images yes, async tasks no
+- `image generate` is text-to-image generation.
+- Future commands may add other OpenAI-compatible image API surfaces as separate command contracts.
+- Capabilities are descriptive metadata. Generation does not block requests by provider capability before transport.
+- Unsupported option support must come from the provider response, not local provider-specific filtering.
 
-Public CLI gating:
+## Provider Interface Layer
 
-- v1 only exposes `generate`, even when plugin capability includes `edit`.
+Provider routing and API interfaces are separate:
 
-## Provider Plugin Contract
+- Provider profile: provider id, aliases, base URL, auth profile, capabilities, interface adapter id.
+- Interface adapter: the API surface used to build and parse provider HTTP calls.
 
-```ts
-type ProviderPlugin = {
-  providerId: CanonicalProviderId;
-  aliases: string[];
-  capabilities: ProviderCapabilities;
-  buildGenerateOperation(input: ProviderGenerateContext): ProviderOperation;
-  buildEditOperation?(input: ProviderEditContext): ProviderOperation;
-  parseGenerateResponse(result: CurlExecutionResult, input: ProviderGenerateContext): Promise<GenerateResult>;
-  classifyFailure(error: ProviderErrorContext): FailureClassification;
-};
-```
+Built-in adapter ids:
 
-Rules:
+- `native-image`
+- `openai-compatible-chat`
+- `gemini-generate-content`
 
-- Plugins may only consume normalized protocol input plus provider config.
-- Plugins may add provider-native fields from `extra`.
-- Plugins may not reinterpret protocol-owned fields with different semantics.
-- Plugins must classify failures into retryable auth/quota, retryable transport, non-retryable request, or unknown.
+Adapters and direct provider implementations both consume the same `GenerateRequest`.
 
-## `--extra` Rules
+## Config
 
-- `--extra` must parse as a JSON object.
-- Arrays, scalars, and invalid JSON are rejected.
-- Keys matching normalized protocol fields are rejected.
-- The rejection happens before provider invocation.
-- Providers may define a whitelist or passthrough mapping for extra fields.
-
-Reserved protocol-owned keys:
-
-- `prompt`
-- `model`
-- `size`
-- `normalizedSize`
-- `aspectRatio`
-- `count`
-- `images`
-- `quality`
-- `outputFormat`
-- `background`
-- `negativePrompt`
-- `seed`
-- `stream`
-- `outputDir`
-- `json`
-- `extra`
-
-## Output Contract
-
-Default output directory:
-
-- `./image-output/<timestamp>/`
-
-Rules:
-
-- The runtime saves any returned image bytes or downloaded image URLs into the output directory.
-- Normal mode prints absolute output paths and a compact summary.
-- `--json` prints a machine-readable manifest to stdout.
-- The manifest includes provider id, model id, output files, provider response metadata, and warnings.
-- If a provider returns temporary URLs, the manifest must include an expiry warning.
-
-## Config Layout
-
-Root config directory:
-
-- `~/.image/`
-
-Files:
-
-- `~/.image/config.json`
-- `~/.image/config.example.jsonc`
-- `~/.image/README.md`
-- `~/.image/skills/image-cli/SKILL.md`
-- `~/.image/skills/image-cli/README.md`
-- `~/.claude/skills/image-cli/SKILL.md`
-- `~/.claude/skills/image-cli/README.md`
-- `~/.agents/skills/image-cli/SKILL.md`
-- `~/.agents/skills/image-cli/README.md`
-- `~/.codex/skills/image-cli/SKILL.md`
-- `~/.codex/skills/image-cli/README.md`
-- `~/antigravity/skills/image-cli/SKILL.md`
-- `~/antigravity/skills/image-cli/README.md`
-
-### `config.json`
-
-Strict JSON only.
+`~/.image/config.json`:
 
 ```json
 {
   "version": 1,
-  "defaultProvider": "openai",
+  "defaultModel": "openai/gpt-image-1.5",
   "providers": {
     "openai": {
       "enabled": true,
       "apiBaseUrl": "https://api.openai.com/v1",
-      "defaultModel": "gpt-image-1.5",
       "timeoutMs": 120000,
       "retryPolicy": {
         "maxAttempts": 2
       },
-      "api_key": "YOUR_OPENAI_API_KEY"
+      "api_key": ["YOUR_OPENAI_API_KEY"]
     }
   }
 }
 ```
 
-## Credential Rotation
+`api_key` may be a string or ordered string array. Empty values are ignored.
+Runtime credential failover uses the configured order.
 
-Per provider:
+## Output
 
-- load the configured `api_key`
-- build one credential candidate for the provider
-- attempt it once
-- retry behavior is provider-classified, but no multi-key rotation exists in the direct-`api_key` configuration model
+Plain successful `image generate` output:
 
-Retryable credential failures:
+```text
+/absolute/path/to/image-1.png
+manifest: /absolute/path/to/manifest.json
+warning: optional warning text
+```
 
-- invalid or revoked key
-- exhausted quota or insufficient balance
-- rate limit
-- transient auth rejection
+Rules:
 
-Do not rotate on:
+- stdout contains generated file paths, manifest path, and warnings.
+- stderr contains errors.
+- `--json` prints the manifest JSON.
+- Default output must not include raw requests, raw responses, secrets, or long diagnostics.
+- Manifest usage fields use OpenAI-style token names when usage data is available.
 
-- invalid request body
-- unsupported model
-- invalid image input
-- malformed `--extra`
+## Provider Model Listing
 
-Rotation state is per invocation only and never persisted.
+`image provider list` lists providers currently configured in `~/.image/config.json`.
 
-## Transport
+`image provider <provider-id> model list` lists model ids for a configured provider.
 
-Shared transport requirements:
+Rules:
 
-- build `curl` argv arrays, never shell-concatenated command strings
-- support JSON bodies
-- support multipart file uploads
-- support streamed response capture
-- support explicit timeout
-- capture exit code, stdout, stderr, and response headers
-- preserve provider request id headers when available
+- Prefer provider API discovery when the built-in integration supports it.
+- If API discovery is unavailable, print built-in model ids with an English warning.
+- Plugin providers can be listed from config even when model discovery is unavailable.
 
-## Initial Provider Mapping Rules
+## Plugins
 
-### OpenAI
+Plugins register provider ids under `~/.image/plugins/<name>/plugin.json`.
 
-- endpoint: `POST /images/generations`
-- default model: `gpt-image-1.5`
-- optional future edit endpoint: `POST /images/edits`
-- auth header: `Authorization: Bearer`
+Plugin actions:
 
-### OpenRouter
+- `build-generate`
+- `parse-generate`
 
-- endpoint: `POST /chat/completions`
-- default model: `google/gemini-3.1-flash-image-preview`
-- auth header: `Authorization: Bearer`
-- use `modalities: ["image", "text"]`
-- use `image_config.aspect_ratio` and `image_config.image_size` when available
+Plugin payloads use the same `GenerateRequest` and provider context as built-in providers.
 
-### Gemini
+## Error Handling
 
-- native endpoint: `POST /models/{model}:generateContent`
-- default model: `gemini-3.1-flash-image-preview`
-- auth header: `x-goog-api-key`
-- treat Nano Banana aliases as Gemini models
+Detailed error-handling rules live in `docs/error-handling.md`.
 
-### Seedream
+Required behavior:
 
-- endpoint: `POST /images/generations`
-- default model: `doubao-seedream-4.5`
-- auth header: `Authorization: Bearer`
-- support provider extra for sequential generation controls
-
-### Qwen
-
-- sync generate/edit endpoint: `POST /services/aigc/multimodal-generation/generation`
-- default model: `qwen-image-2.0-pro`
-- async generate endpoint: `POST /services/aigc/text2image/image-synthesis`
-- poll endpoint: `GET /tasks/{task_id}`
-
-### MiniMax
-
-- endpoint: `POST /image_generation`
-- default model: `image-01`
-- auth header: `Authorization: Bearer`
-- support reference-image flow through provider-native fields
-
-## Error Model
-
-Runtime error categories:
-
-- `ConfigError`
-- `ValidationError`
-- `ProviderCapabilityError`
-- `ProviderRequestError`
-- `ProviderAuthError`
-- `ProviderRateLimitError`
-- `ProviderQuotaError`
-- `TransportError`
-
-Each user-facing error must include:
-
-- category
-- provider when known
-- summary
-- actionable hint
-
-## Test Requirements
-
-All tests live under `test/`.
-
-Minimum coverage targets:
-
-- CLI parsing and help text snapshots
-- model alias resolution
-- size normalization and conflicts
-- `--extra` validation
-- config loading and env precedence
-- transport JSON and multipart construction
-- failover rotation behavior
-- per-provider request building
-- per-provider response parsing
-- Qwen async polling
-- output directory and manifest generation
-
-## Docs And Skill
-
-Required docs:
-
-- `README.md`
-- `SPEC.md`
-- generated CLI help text through the CLI implementation
-- `.agents/skills/image-cli/SKILL.md`
-
-Skill requirements:
-
-- explain how to configure providers
-- explain `image generate`
-- explain `image config` subcommands
-- explain `--extra`
-- keep wording concise and usage-focused
+- validation errors are concise and flag-specific
+- provider request failures include provider name and safe status details
+- retryable credential failures rotate credentials
+- raw provider responses stay in `manifest.json`, not default stdout

@@ -14,7 +14,7 @@ function makeContext(
         providerAlias: "nano-banana",
         modelId: "gemini-3.1-flash-image-preview"
       },
-      aspectRatio: "16:9"
+      size: "1280x720"
     },
     providerConfig: {
       enabled: true,
@@ -35,21 +35,43 @@ function makeContext(
       envName: "API_KEY",
       value: "test-key"
     },
-    preparedImages: [
-      {
-        source: "local.png",
-        kind: "inline",
-        mimeType: "image/png",
-        base64Data: "YWJjMTIz"
-      }
-    ],
     ...overrides
   };
 }
 
 describe("gemini provider", () => {
-  test("builds a native generateContent request with inline image parts", async () => {
-    const operation = await geminiProvider.buildGenerateOperation(makeContext());
+  test("builds a native generateContent request from OpenAI-compatible size", async () => {
+    const operation = await geminiProvider.buildGenerateOperation(
+      makeContext({
+        request: {
+          prompt: "a paper cutout fox",
+          model: {
+            providerId: "gemini",
+            providerAlias: "nano-banana",
+            modelId: "gemini-3.1-flash-image-preview"
+          },
+          size: "1280x720",
+          n: 2,
+          quality: "high",
+          output_format: "webp",
+          moderation: "low",
+          stream: true,
+          partial_images: 1,
+          user: "agent-1",
+          extra: {
+            safetySettings: [
+              {
+                category: "HARM_CATEGORY_DANGEROUS_CONTENT",
+                threshold: "BLOCK_NONE"
+              }
+            ],
+            generationConfig: {
+              candidateCount: 1
+            }
+          }
+        }
+      })
+    );
 
     expect(operation.request.method).toBe("POST");
     expect(operation.request.url).toBe(
@@ -59,45 +81,39 @@ describe("gemini provider", () => {
       "x-goog-api-key": "test-key"
     });
     expect(operation.request.json).toEqual({
+      safetySettings: [
+        {
+          category: "HARM_CATEGORY_DANGEROUS_CONTENT",
+          threshold: "BLOCK_NONE"
+        }
+      ],
       contents: [
         {
           role: "user",
           parts: [
             {
               text: "a paper cutout fox"
-            },
-            {
-              inlineData: {
-                mimeType: "image/png",
-                data: "YWJjMTIz"
-              }
             }
           ]
         }
       ],
       generationConfig: {
-        responseModalities: ["IMAGE"],
-        imageConfig: {
-          aspectRatio: "16:9"
+        candidateCount: 1,
+        n: 2,
+        quality: "high",
+        output_format: "webp",
+        moderation: "low",
+        stream: true,
+        partial_images: 1,
+        user: "agent-1",
+        responseModalities: ["Image"],
+        responseFormat: {
+          image: {
+            aspectRatio: "16:9"
+          }
         }
       }
     });
-  });
-
-  test("rejects prepared image urls", async () => {
-    await expect(
-      geminiProvider.buildGenerateOperation(
-        makeContext({
-          preparedImages: [
-            {
-              source: "remote.png",
-              kind: "url",
-              url: "https://example.com/remote.png"
-            }
-          ]
-        })
-      )
-    ).rejects.toThrow(/prepared image urls/i);
   });
 
   test("parses inline image responses and adds a SynthID warning", async () => {
@@ -121,7 +137,12 @@ describe("gemini provider", () => {
                 ]
               }
             }
-          ]
+          ],
+          usageMetadata: {
+            promptTokenCount: 7,
+            candidatesTokenCount: 2,
+            totalTokenCount: 9
+          }
         })
       },
       makeContext()
@@ -135,6 +156,34 @@ describe("gemini provider", () => {
     ]);
     expect(result.warnings).toContain(
       "Gemini-generated images are SynthID watermarked."
+    );
+    expect(result.usage).toEqual({
+      promptTokenCount: 7,
+      candidatesTokenCount: 2,
+      totalTokenCount: 9
+    });
+  });
+
+  test("throws google error bodies before extracting images", async () => {
+    await expect(
+      geminiProvider.parseGenerateResponse(
+        {
+          statusCode: 400,
+          headers: {},
+          stderrText: "",
+          exitCode: 0,
+          bodyText: JSON.stringify({
+            error: {
+              code: 400,
+              message: "Invalid image config",
+              status: "INVALID_ARGUMENT"
+            }
+          })
+        },
+        makeContext()
+      )
+    ).rejects.toThrow(
+      /Gemini request failed with HTTP 400: 400: Invalid image config/
     );
   });
 

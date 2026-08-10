@@ -5,32 +5,42 @@ import type { ProviderGenerateContext } from "../../src/providers/types.js";
 import type { CurlExecutionResult } from "../../src/transport/curl.js";
 
 describe("seedream provider", () => {
-  test("builds grouped generation requests with reference images and provider extras", async () => {
+  test("defaults to watermark disabled and allows explicit watermark", async () => {
+    const defaultOperation = await seedreamProviderPlugin.buildGenerateOperation(makeContext());
+    expect(defaultOperation.request.json).toMatchObject({
+      watermark: false
+    });
+
+    const explicitOperation = await seedreamProviderPlugin.buildGenerateOperation(
+      makeContext({
+        request: {
+          extra: {
+            watermark: true
+          }
+        }
+      })
+    );
+    expect(explicitOperation.request.json).toMatchObject({
+      watermark: true
+    });
+  });
+
+  test("builds OpenAI-compatible generation requests", async () => {
     const input = makeContext({
       request: {
-        count: 3,
+        n: 3,
         stream: true,
+        quality: "high",
+        output_format: "webp",
+        response_format: "b64_json",
+        user: "agent-1",
         extra: {
           watermark: false,
-          response_format: "b64_json",
           optimize_prompt_options: {
             mode: "standard"
           }
         }
-      },
-      preparedImages: [
-        {
-          source: "source-1",
-          kind: "url",
-          url: "https://example.com/reference.png"
-        },
-        {
-          source: "source-2",
-          kind: "inline",
-          mimeType: "image/jpeg",
-          base64Data: "base64-inline"
-        }
-      ]
+      }
     });
 
     const operation = await seedreamProviderPlugin.buildGenerateOperation(input);
@@ -46,20 +56,20 @@ describe("seedream provider", () => {
       json: {
         model: "doubao-seedream-4.5",
         prompt: "a calm product scene",
-        size: "2K",
+        n: 3,
+        quality: "high",
+        output_format: "webp",
+        watermark: false,
+        optimize_prompt_options: {
+          mode: "standard"
+        },
+        size: "2048x2048",
         response_format: "b64_json",
         stream: true,
-        watermark: false,
-        reference_images: [
-          "https://example.com/reference.png",
-          "data:image/jpeg;base64,base64-inline"
-        ],
+        user: "agent-1",
         sequential_image_generation: "auto",
         sequential_image_generation_options: {
           max_images: 3
-        },
-        optimize_prompt_options: {
-          mode: "standard"
         }
       }
     });
@@ -94,12 +104,12 @@ describe("seedream provider", () => {
       modelId: "doubao-seedream-4.5",
       images: [
         {
-          outputFormat: "url",
+          output_format: "url",
           url: "https://ark-content-generati.example/image-1.png",
           warnings: ["Temporary URL; expires in 24 hours."]
         },
         {
-          outputFormat: "b64_json",
+          output_format: "b64_json",
           dataBase64: "YmFzZTY0LWltYWdl"
         }
       ],
@@ -154,11 +164,32 @@ describe("seedream provider", () => {
       reason: "server error"
     });
   });
+
+  test("throws seedream error responses before extracting images", async () => {
+    await expect(
+      seedreamProviderPlugin.parseGenerateResponse(
+        {
+          statusCode: 429,
+          headers: {},
+          bodyText: JSON.stringify({
+            error: {
+              code: "rate_limit_exceeded",
+              message: "Too many requests"
+            }
+          }),
+          stderrText: "",
+          exitCode: 0
+        },
+        makeContext()
+      )
+    ).rejects.toThrow(
+      /Seedream request failed with HTTP 429: rate_limit_exceeded: Too many requests/
+    );
+  });
 });
 
 type ContextOverrides = {
   request?: Partial<ProviderGenerateContext["request"]>;
-  preparedImages?: ProviderGenerateContext["preparedImages"];
 };
 
 function makeContext(overrides: ContextOverrides = {}): ProviderGenerateContext {
@@ -184,7 +215,6 @@ function makeContext(overrides: ContextOverrides = {}): ProviderGenerateContext 
       envName: "API_KEY",
       value: "test-key"
     },
-    preparedImages: overrides.preparedImages ?? [],
     request: {
       prompt: "a calm product scene",
       model: {
@@ -192,12 +222,11 @@ function makeContext(overrides: ContextOverrides = {}): ProviderGenerateContext 
         providerAlias: "seedream",
         modelId: "doubao-seedream-4.5"
       },
-      size: "2K",
-      count: 1,
+      size: "2048x2048",
+      n: 1,
       stream: false,
-      extra: {},
       ...requestOverrides
-    },
+    }
   };
 }
 

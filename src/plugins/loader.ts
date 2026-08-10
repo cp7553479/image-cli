@@ -42,11 +42,9 @@ export function createPluginProvider(
     capabilities: {
       generate: true,
       edit: false,
-      inputImages: false,
       asyncTasks: false,
       streaming: false,
       background: false,
-      negativePrompt: false,
       multipleOutputs: false,
       transparentOutput: false,
       ...(manifest.capabilities ?? {})
@@ -83,6 +81,7 @@ async function runPluginAction<T = unknown>(
   action: PluginAction,
   payload: unknown
 ): Promise<T> {
+  // See docs/error-handling.md#plugin-failures for plugin stdout/stderr rules.
   const args = buildPluginArgs(manifest, action);
   const stdout = await runProcess(args.command, args.args, payload);
   return JSON.parse(stdout) as T;

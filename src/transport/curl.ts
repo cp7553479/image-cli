@@ -48,6 +48,7 @@ export type CurlDownloadRequest = {
 export async function executeCurlRequest(
   request: CurlRequest
 ): Promise<CurlExecutionResult> {
+  // See docs/error-handling.md#transport-errors for curl boundary behavior.
   const tempDir = await mkdtemp(path.join(os.tmpdir(), "image-cli-curl-"));
   const headersFile = path.join(tempDir, "headers.txt");
   const bodyFile = path.join(tempDir, "body.txt");

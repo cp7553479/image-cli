@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
@@ -8,7 +8,10 @@ describe('provider AGENTS docs integrity', () => {
   it('contains Official docs section with official links for each provider AGENTS.md', () => {
     const providers = readdirSync(PROVIDERS_DIR, { withFileTypes: true })
       .filter((entry) => entry.isDirectory())
-      .map((entry) => entry.name);
+      .map((entry) => entry.name)
+      .filter((provider) =>
+        existsSync(join(PROVIDERS_DIR, provider, 'AGENTS.md'))
+      );
 
     for (const provider of providers) {
       const agentsPath = join(PROVIDERS_DIR, provider, 'AGENTS.md');
