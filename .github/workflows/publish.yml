@@ -1,0 +1,49 @@
+name: Publish to npm
+
+# Tokenless, OTP-less publishing via npm Trusted Publishing (OIDC).
+# Configure the trusted publisher on npmjs.com for @cp7553479/image-cli
+# with Workflow filename = publish.yml, then push a tag like v0.1.2 to release.
+
+on:
+  push:
+    tags:
+      - "v*"
+
+# id-token:write is required for npm to mint an OIDC token and verify this run.
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Build, verify & publish
+    runs-on: ubuntu-latest
+    # Must match the trusted publisher's "Environment name" if you set one.
+    # Leave as-is if you left Environment name empty on npm.
+    environment: npm
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify (typecheck, lint, test, build)
+        run: npm run verify
+
+      - name: Publish
+        run: npm publish --access public --provenance
+        env:
+          # No token needed — npm authenticates this run via OIDC.
+          NODE_AUTH_TOKEN: ""
