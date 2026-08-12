@@ -54,7 +54,6 @@ jobs:
         run: npm install -g npm@11
 
       - name: Publish
-        # TEMP: verbose http logging to diagnose OIDC exchange (E404 on PUT).
-        run: npm publish --access public --provenance --loglevel=http
+        run: npm publish --access public --provenance
         # No token needed — npm authenticates this run via OIDC.
         # Intentionally NOT setting NODE_AUTH_TOKEN, which would override OIDC.
