@@ -4,7 +4,9 @@ name: Publish to npm
 # Configure the trusted publisher on npmjs.com for @cp7553479/image-cli:
 #   Repository = image-cli, Workflow filename = publish.yml,
 #   Environment name = (leave blank).
-# Then push a tag like v0.1.2 to release.
+# Then push a tag like v0.1.3 to release.
+# Note: trusted publishing requires npm >= 11.5.1 — the workflow upgrades
+# npm explicitly because the npm bundled with Node 20 is too old (E404).
 
 on:
   push:
@@ -43,6 +45,11 @@ jobs:
 
       - name: Verify (typecheck, lint, test, build)
         run: npm run verify
+
+      - name: Upgrade npm for trusted publishing
+        # npm bundled with Node 20 is 10.x; trusted publishing needs >= 11.5.1.
+        # Without this the publish PUT is rejected with E404.
+        run: npm install -g npm@latest
 
       - name: Publish
         run: npm publish --access public --provenance
