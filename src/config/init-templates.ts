@@ -174,23 +174,23 @@ Basic form:
 image generate "<prompt>" --model provider/model
 \`\`\`
 
-Common flags:
+Common flags (values are passed through to the provider as-is, without CLI-side validation):
 
-- \`--size auto|WIDTHxHEIGHT\`
+- \`--size <value>\` (e.g. auto, 1024x1024, 2K)
 - \`--n <count>\`
 - \`--quality <value>\`
-- \`--background auto|opaque|transparent\`
-- \`--output-format png|jpeg|webp\`
-- \`--output-compression <0-100>\`
-- \`--moderation auto|low\`
-- \`--response-format url|b64_json\`
+- \`--background <value>\`
+- \`--output-format <value>\` (e.g. png, jpeg, webp)
+- \`--output-compression <value>\`
+- \`--moderation <value>\`
+- \`--response-format <value>\` (e.g. url, b64_json)
 - \`--stream\`
 - \`--partial-images <count>\`
-- \`--style vivid|natural\`
+- \`--style <value>\`
 - \`--user <id>\`
 - \`--reference-image <path|url>\` (repeatable; image-to-image / edit)
 - \`--mask <path|url>\` (transparent areas are editable)
-- \`--input-fidelity <low|high>\` (gpt-image fidelity to reference image)
+- \`--input-fidelity <value>\` (fidelity to reference image, gpt-image)
 - \`--extra <json object>\`
 - \`--output-dir <path>\`
 - \`--json\`
@@ -200,10 +200,12 @@ to fuse several reference images. Each provider adapts the reference images to
 its native API. Downloaded reference images are cached under \`~/.image/.temp/\`.
 
 \`--extra\` is for provider-specific options beyond the OpenAI-compatible fields.
-It must be a JSON object and cannot override standard fields.
+It must be a JSON object. It is merged into the request before standard fields,
+so an explicit flag always takes precedence over a value in \`--extra\`.
 
-The CLI validates only the common request shape. Provider-specific option
-support is decided by the remote provider response.
+The CLI does not validate flag values; everything is passed through to the
+provider. Provider-specific option support is decided by the remote provider
+response.
 
 \`\`\`bash
 image generate "Editorial portrait with dramatic rim light" --model openai/gpt-image-1.5 --size 1536x1024 --output-format png --response-format b64_json

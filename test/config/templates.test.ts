@@ -1,4 +1,5 @@
 import { describe, expect, test } from "vitest";
+import { readFile } from "node:fs/promises";
 
 import {
   buildConfigTemplates,
@@ -55,5 +56,29 @@ describe("config templates", () => {
     const defaultTemplates = buildConfigTemplates();
     expect(defaultTemplates.config).toContain(`"apiBaseUrl": "${VOLCENGINE_API_BASE_URL}"`);
     expect(defaultTemplates.configExample).toContain(VOLCENGINE_API_BASE_URL);
+  });
+
+  test("skill documents current provider aliases and passthrough flags", () => {
+    const templates = buildConfigTemplates();
+
+    expect(templates.skill).toContain("`doubao-seedream` -> `volcengine`");
+    expect(templates.skill).toContain("`dashscope` -> `bailian`");
+    expect(templates.skill).not.toContain("-> `seedream`");
+    expect(templates.skill).not.toContain("-> `qwen`");
+    expect(templates.skill).not.toContain("`qwen-image`");
+
+    expect(templates.skill).toContain("--size <value>");
+    expect(templates.skill).toContain("passed through");
+    expect(templates.skill).toContain("explicit flag always takes precedence");
+    expect(templates.skill).not.toContain("auto|WIDTHxHEIGHT");
+  });
+
+  test("workspace skill copy matches the template", async () => {
+    const workspaceSkill = await readFile(
+      new URL("../../.agents/skills/image-cli/SKILL.md", import.meta.url),
+      "utf8"
+    );
+
+    expect(workspaceSkill).toBe(buildConfigTemplates().skill);
   });
 });

@@ -9,3 +9,10 @@ Keep files concise, execution-focused, and free of prompt commentary.
 - When code talks to servers, handle error responses explicitly.
 - Prefer Node built-ins for runtime code. Adding a third-party runtime dependency requires a documented exception in `SPEC.md` and tests for the new boundary.
 - Be test-driven against real APIs: capture the actual request and response bodies before writing provider request/response mapping. When no real test environment is available, consult the official API docs instead. Do not write fallback or guesswork logic (e.g. trying multiple response shapes or field-name variants) unless it is genuinely necessary.
+
+## Skill
+
+- Skill source of truth: the `SKILL_MD` / `SKILL_README` templates in `src/config/init-templates.ts`. `image config init` installs them to `~/.image/skills/image-cli/`, `~/.claude/skills/image-cli/`, `~/.agents/skills/image-cli/`, `~/.codex/skills/image-cli/`, and `~/antigravity/skills/image-cli/`.
+- The tracked copy at `.agents/skills/image-cli/SKILL.md` must stay identical to the template (enforced by `test/config/templates.test.ts`); edit the template, then sync copies — never edit copies directly.
+- Any change to commands, flags, providers, aliases, or config flow must update the skill in the same change, keeping it consistent with `SPEC.md` and `image generate --help` output.
+- Keep the skill concise and command-oriented: supported commands, flags, and config flow only. Installation/repair steps belong in the skill `README.md`. No secrets, no development notes, no version history.
