@@ -1,6 +1,11 @@
 import { describe, expect, test, vi } from "vitest";
+import { setTimeout as delay } from "node:timers/promises";
 
 import { bailianProvider } from "../../src/providers/bailian/index.js";
+
+vi.mock("node:timers/promises", () => ({
+  setTimeout: vi.fn(async () => undefined)
+}));
 
 vi.mock("../../src/providers/image-input.js", () => ({
   resolveImageToDataUrl: vi.fn(async (input: { url?: string; file?: string }) =>
@@ -220,6 +225,9 @@ describe("bailian provider", () => {
     );
 
     expect(execute).toHaveBeenCalledTimes(2);
+    // The first poll fires immediately; each subsequent poll waits 2s.
+    expect(vi.mocked(delay)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(delay)).toHaveBeenCalledWith(2_000);
     expect(execute.mock.calls[0]?.[0]).toEqual({
       method: "GET",
       url: "https://dashscope.aliyuncs.com/api/v1/tasks/task-1",

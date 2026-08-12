@@ -1,3 +1,5 @@
+import { setTimeout as delay } from "node:timers/promises";
+
 import type { GenerateRequest } from "../../protocol/request.js";
 import type {
   CurlExecutionResult,
@@ -36,6 +38,8 @@ const ASYNC_HEADER_NAME = "X-DashScope-Async";
 const ASYNC_HEADER_VALUE = "enable";
 /** 异步任务最大轮询次数（次）。超过后视为超时失败。 */
 const MAX_POLL_ATTEMPTS = 30;
+/** 两次轮询之间的等待间隔（毫秒）。首次轮询不等待，立即查询。 */
+const POLL_INTERVAL_MS = 2_000;
 const ASYNC_MODEL_IDS = new Set(["qwen-image", "qwen-image-plus"]);
 
 type BailianResponse = {
@@ -207,6 +211,12 @@ function buildAsyncOperation(input: ProviderGenerateContext): ProviderOperation 
 
         if (taskStatus !== "PENDING" && taskStatus !== "RUNNING" && attempt === 0) {
           throw new Error(`Bailian task ${taskId} returned unknown status "${taskStatus ?? ""}".`);
+        }
+
+        // 首次轮询立即发出，之后每次轮询前等待固定间隔，避免在任务
+        // 完成前（通常数秒）瞬间耗尽全部轮询次数。
+        if (attempt > 0) {
+          await delay(POLL_INTERVAL_MS);
         }
 
         const pollResult = await tools.execute({
