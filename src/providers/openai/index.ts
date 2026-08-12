@@ -296,7 +296,7 @@ function collectWarnings(parsed: Record<string, unknown> | undefined): string[] 
 
 function toProviderImageResult(
   item: Record<string, unknown>,
-  output_format: "png" | "jpeg" | "webp",
+  output_format: string,
   mimeType: string
 ): ProviderImageResult {
   const result: ProviderImageResult = {
@@ -316,7 +316,7 @@ function toProviderImageResult(
   return result;
 }
 
-function mimeTypeForFormat(format: "png" | "jpeg" | "webp"): string {
+function mimeTypeForFormat(format: string): string {
   switch (format) {
     case "jpeg":
       return "image/jpeg";

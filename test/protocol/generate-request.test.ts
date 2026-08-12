@@ -73,51 +73,49 @@ describe("generate request building", () => {
     });
   });
 
-  test("rejects invalid numeric flags", () => {
-    expect(() =>
-      buildGenerateRequest("prompt", {
-        model: "openai/chatgpt-image-latest",
-        n: "0"
-      })
-    ).toThrow(/--n/i);
-    expect(() =>
-      buildGenerateRequest("prompt", {
-        model: "openai/chatgpt-image-latest",
-        output_compression: "101"
-      })
-    ).toThrow(/--output-compression/i);
-    expect(() =>
-      buildGenerateRequest("prompt", {
-        model: "openai/chatgpt-image-latest",
-        partial_images: "4"
-      })
-    ).toThrow(/--partial-images/i);
-  });
-
-  test("rejects unsupported enum flags", () => {
-    expect(() =>
-      buildGenerateRequest("prompt", {
-        model: "openai/chatgpt-image-latest",
-        size: "2k"
-      })
-    ).toThrow(/--size/i);
-    expect(() =>
-      buildGenerateRequest("prompt", {
-        model: "openai/chatgpt-image-latest",
-        output_format: "gif"
-      })
-    ).toThrow(/--output-format/i);
-    expect(() =>
-      buildGenerateRequest("prompt", {
-        model: "openai/chatgpt-image-latest",
-      response_format: "base64"
-    })
-  ).toThrow(/--response-format/i);
-  });
-
-  test("parses provider-specific extra JSON and rejects overrides", () => {
+  test("passes numeric flags through without range validation", () => {
+    // No range checks: provider response decides validity.
     const request = buildGenerateRequest("prompt", {
-      model: "seedream/doubao-seedream-4.5",
+      model: "openai/chatgpt-image-latest",
+      n: "0",
+      output_compression: "101",
+      partial_images: "4"
+    });
+
+    expect(request).toMatchObject({
+      n: 0,
+      output_compression: 101,
+      partial_images: 4
+    });
+  });
+
+  test("passes enum-like flags through verbatim without validation", () => {
+    // Values outside the common enums are forwarded as-is; provider decides.
+    const request = buildGenerateRequest("prompt", {
+      model: "openai/chatgpt-image-latest",
+      size: "2K",
+      output_format: "gif",
+      response_format: "base64",
+      background: "gradient",
+      moderation: "strict",
+      style: "painterly",
+      input_fidelity: "ultra"
+    });
+
+    expect(request).toMatchObject({
+      size: "2K",
+      output_format: "gif",
+      response_format: "base64",
+      background: "gradient",
+      moderation: "strict",
+      style: "painterly",
+      input_fidelity: "ultra"
+    });
+  });
+
+  test("parses extra JSON and forwards it without field-occupation checks", () => {
+    const request = buildGenerateRequest("prompt", {
+        model: "volcengine/doubao-seedream-4.5",
       extra: '{"watermark":false,"optimize_prompt_options":{"mode":"standard"}}'
     });
 
@@ -128,13 +126,15 @@ describe("generate request building", () => {
       }
     });
 
-    expect(() =>
-      buildGenerateRequest("prompt", {
-        model: "openai/gpt-image-1.5",
-        extra: '{"model":"other"}'
-      })
-    ).toThrow(/must not override/i);
+    // Keys that collide with standard fields are no longer rejected; explicit
+    // flags still win because providers merge extra before standard fields.
+    const colliding = buildGenerateRequest("prompt", {
+      model: "openai/gpt-image-1.5",
+      extra: '{"model":"other","size":"2K"}'
+    });
+    expect(colliding.extra).toEqual({ model: "other", size: "2K" });
 
+    // Non-object payloads are still rejected (structural, not value validation).
     expect(() =>
       buildGenerateRequest("prompt", {
         model: "openai/gpt-image-1.5",
@@ -205,41 +205,32 @@ describe("generate request building", () => {
     ).toThrow(/--mask/i);
   });
 
-  test("parses input fidelity enum", () => {
+  test("passes input fidelity through without validation", () => {
     const request = buildGenerateRequest("edit", {
       model: "openai/gpt-image-1.5",
       input_fidelity: "high"
     });
     expect(request.input_fidelity).toBe("high");
 
-    expect(() =>
-      buildGenerateRequest("edit", {
-        model: "openai/gpt-image-1.5",
-        input_fidelity: "medium"
-      })
-    ).toThrow(/--input-fidelity/i);
+    // Non-standard values are forwarded; provider decides support.
+    const other = buildGenerateRequest("edit", {
+      model: "openai/gpt-image-1.5",
+      input_fidelity: "medium"
+    });
+    expect(other.input_fidelity).toBe("medium");
   });
 
-  test("rejects reference_image, mask, and input_fidelity in extra", () => {
-    expect(() =>
-      buildGenerateRequest("prompt", {
-        model: "openai/gpt-image-1.5",
-        extra: '{"reference_image":"https://example.com/a.png"}'
-      })
-    ).toThrow(/must not override/i);
+  test("forwards reference_image, mask, and input_fidelity placed in extra", () => {
+    // No field-occupation checks; extra is merged by providers as-is.
+    const request = buildGenerateRequest("prompt", {
+      model: "openai/gpt-image-1.5",
+      extra: '{"reference_image":"https://example.com/a.png","mask":"https://example.com/a.png","input_fidelity":"high"}'
+    });
 
-    expect(() =>
-      buildGenerateRequest("prompt", {
-        model: "openai/gpt-image-1.5",
-        extra: '{"mask":"https://example.com/a.png"}'
-      })
-    ).toThrow(/must not override/i);
-
-    expect(() =>
-      buildGenerateRequest("prompt", {
-        model: "openai/gpt-image-1.5",
-        extra: '{"input_fidelity":"high"}'
-      })
-    ).toThrow(/must not override/i);
+    expect(request.extra).toEqual({
+      reference_image: "https://example.com/a.png",
+      mask: "https://example.com/a.png",
+      input_fidelity: "high"
+    });
   });
 });

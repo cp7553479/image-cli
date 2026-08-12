@@ -57,11 +57,7 @@ export const minimaxProviderPlugin: ProviderPlugin = {
     const body = parseJsonBody(result.bodyText, result.statusCode >= 400);
     assertSuccessfulResponse("MiniMax", result, body);
 
-    const baseRespStatusCode = getNumber(
-      body,
-      ["base_resp", "status_code"],
-      getNumber(body, ["status_code"])
-    );
+    const baseRespStatusCode = getNumber(body, ["base_resp", "status_code"]);
     const images = parseImages(body, input.request);
     const warnings = [...new Set(images.flatMap((image) => image.warnings ?? []))];
 
@@ -89,11 +85,7 @@ export const minimaxProviderPlugin: ProviderPlugin = {
     }
 
     const body = parseJsonBody(response.bodyText, true);
-    const baseRespStatusCode = getNumber(
-      body,
-      ["base_resp", "status_code"],
-      getNumber(body, ["status_code"])
-    );
+    const baseRespStatusCode = getNumber(body, ["base_resp", "status_code"]);
 
     if (isRetryableCredentialStatus(response.statusCode, baseRespStatusCode)) {
       return {

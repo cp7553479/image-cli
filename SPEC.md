@@ -108,21 +108,21 @@ type GenerateRequest = {
   size?: string;
   n?: number;
   quality?: string;
-  background?: "auto" | "opaque" | "transparent";
-  output_format?: "png" | "jpeg" | "webp";
+  background?: string;
+  output_format?: string;
   output_compression?: number;
-  moderation?: "auto" | "low";
-  response_format?: "url" | "b64_json";
+  moderation?: string;
+  response_format?: string;
   stream?: boolean;
   partial_images?: number;
-  style?: "vivid" | "natural";
+  style?: string;
   user?: string;
   extra?: Record<string, unknown>;
   outputDir?: string;
   json?: boolean;
   reference_images?: ImageInput[];
   mask?: ImageInput;
-  input_fidelity?: "low" | "high";
+  input_fidelity?: string;
 };
 
 type ImageInput = { url: string } | { file: string };
@@ -130,19 +130,21 @@ type ImageInput = { url: string } | { file: string };
 
 `reference_images` carries one or more source images for image-to-image / edit
 requests. `mask` marks the editable region. `input_fidelity` controls fidelity
-to the reference image. All three are validated by the protocol layer but
-provider-specific support is decided by the provider response.
+to the reference image. Their input form (URL vs local file) is parsed by the
+protocol layer; value support is decided by the provider response.
 
 `extra` carries provider-specific options outside the OpenAI-compatible image
-fields. It must be a JSON object and must not override standard fields.
+fields. It must be a JSON object. It is merged into provider requests before
+the standard fields, so an explicit flag always takes precedence over a value
+placed in `extra`.
 
 The protocol layer owns:
 
 - model reference parsing
-- enum validation
-- numeric validation
 - command help
 - conversion from CLI option spelling to request field spelling
+- numeric coercion (string → number; no range validation)
+- structural parsing of image inputs (URL vs local file) and `--extra` JSON
 
 The provider layer owns:
 
@@ -163,8 +165,8 @@ Built-in provider ids:
 - `openai`
 - `openrouter`
 - `gemini`
-- `seedream`
-- `qwen`
+- `volcengine`
+- `bailian`
 - `minimax`
 
 Built-in aliases:
@@ -172,8 +174,8 @@ Built-in aliases:
 - `chatgpt-image` -> `openai`
 - `openrouter-image` -> `openrouter`
 - `nano-banana` -> `gemini`
-- `doubao-seedream` -> `seedream`
-- `qwen-image` -> `qwen`
+- `doubao-seedream` -> `volcengine`
+- `dashscope` -> `bailian`
 - `minimax-image` -> `minimax`
 
 Provider ids and aliases are owned by provider catalog metadata. The protocol
@@ -181,13 +183,10 @@ parser must not keep a separate built-in provider table.
 
 ## Size
 
-`--size` accepts:
-
-- `auto`
-- explicit dimensions as `WIDTHxHEIGHT`
-
-The CLI does not derive dimensions from named presets. Providers that need
-native aspect or size buckets must derive them from `size` in provider code.
+`--size` accepts any string and forwards it verbatim (e.g. `auto`,
+`1024x1024`, `2K`). The CLI does not validate or derive size values. Providers
+that need native aspect or size buckets must derive them from `size` in
+provider code; unsupported values are reported by the provider response.
 
 ## Provider Capability Model
 
@@ -255,6 +254,23 @@ Adapters and direct provider implementations both consume the same `GenerateRequ
 
 `api_key` may be a string or ordered string array. Empty values are ignored.
 Runtime credential failover uses the configured order.
+
+The `volcengine` provider supports two `apiBaseUrl` endpoints:
+
+- `api`: `https://ark.cn-beijing.volces.com/api/v3`
+- `agent plan`: `https://ark.cn-beijing.volces.com/api/plan/v3`
+
+Only the base URL differs; request and response handling are identical.
+`image config init` prompts for the endpoint when run interactively; in
+non-interactive contexts it defaults to the `api` endpoint.
+
+The `bailian` provider uses a workspace-specific base URL:
+
+- `https://{workspaceId}.cn-beijing.maas.aliyuncs.com/api/v1`
+
+The workspaceId is per-account. `image config init` prompts for it when run
+interactively; in non-interactive contexts it writes a
+`YOUR_WORKSPACE_ID` placeholder the user must fill in.
 
 ## Output
 

@@ -71,7 +71,12 @@ export async function executeCurlRequest(
 
   if (request.json !== undefined) {
     await writeFile(jsonFile, JSON.stringify(request.json));
-    args.push("--header", "Content-Type: application/json");
+    // Only add a default Content-Type when the caller did not already supply
+    // one. Duplicated headers make curl join values with a comma
+    // (e.g. "application/json,application/json"), which strict endpoints reject.
+    if (!hasHeader(request.headers, "content-type")) {
+      args.push("--header", "Content-Type: application/json");
+    }
     args.push("--data-binary", `@${jsonFile}`);
   }
 
@@ -121,6 +126,14 @@ export async function downloadCurlFile(
   }
   args.push("--output", request.destinationPath);
   await spawnCurl(args);
+}
+
+function hasHeader(
+  headers: Record<string, string> | undefined,
+  name: string
+): boolean {
+  const target = name.toLowerCase();
+  return Boolean(headers && Object.keys(headers).some((key) => key.toLowerCase() === target));
 }
 
 function formatFormField(field: CurlFormField): string {

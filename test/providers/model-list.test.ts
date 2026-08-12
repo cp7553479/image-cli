@@ -229,19 +229,19 @@ describe("provider and model listing", () => {
   });
 
   test("falls back to built-in model ids with an English warning", async () => {
-    const homeDir = await makeTempHome("image-cli-qwen-models");
+    const homeDir = await makeTempHome("image-cli-bailian-models");
     await writeConfig(homeDir, {
       version: 1,
-      defaultModel: "qwen/qwen-image-2.0-pro",
+      defaultModel: "bailian/qwen-image-2.0-pro",
       providers: {
-        qwen: makeProvider("https://dashscope.aliyuncs.com/api/v1", "qwen-key")
+        bailian: makeProvider("https://llm-test.cn-beijing.maas.aliyuncs.com/api/v1", "bailian-key")
       }
     });
 
-    const result = await listProviderModels("qwen", { homeDir, limit: 2 });
+    const result = await listProviderModels("bailian", { homeDir, limit: 2 });
 
     expect(result).toEqual({
-      providerId: "qwen",
+      providerId: "bailian",
       source: "fallback",
       models: [
         { id: "qwen-image-2.0-pro" },

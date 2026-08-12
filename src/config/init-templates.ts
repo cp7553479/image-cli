@@ -11,6 +11,43 @@ export type InitTemplateFile = {
   contents: string;
 };
 
+export type ConfigTemplateOptions = {
+  /**
+   * Volcengine provider base URL written into config.json.
+   * Defaults to the standard Ark `api` endpoint.
+   */
+  volcengineBaseUrl?: string;
+  /**
+   * Bailian provider base URL written into config.json.
+   * Defaults to a placeholder until a workspaceId is provided.
+   */
+  bailianBaseUrl?: string;
+};
+
+/** Volcengine Ark standard API endpoint. */
+export const VOLCENGINE_API_BASE_URL = "https://ark.cn-beijing.volces.com/api/v3";
+
+/** Volcengine Ark Agent Plan endpoint. */
+export const VOLCENGINE_AGENT_PLAN_BASE_URL = "https://ark.cn-beijing.volces.com/api/plan/v3";
+
+/**
+ * Bailian base URL template. The workspaceId is per-account and must be filled
+ * at init time (or edited into config.json afterwards).
+ *   https://{workspaceId}.cn-beijing.maas.aliyuncs.com/api/v1
+ */
+export const BAILIAN_WORKSPACE_HOST_SUFFIX = ".cn-beijing.maas.aliyuncs.com/api/v1";
+
+/** Placeholder used when no workspaceId is known (non-interactive init). */
+export const BAILIAN_DEFAULT_BASE_URL = `https://YOUR_WORKSPACE_ID${BAILIAN_WORKSPACE_HOST_SUFFIX}`;
+
+const VOLCENGINE_BASE_URL_SENTINEL = "__VOLCENGINE_BASE_URL__";
+const BAILIAN_BASE_URL_SENTINEL = "__BAILIAN_BASE_URL__";
+
+/** Builds the workspace-specific Bailian base URL from a workspaceId. */
+export function bailianBaseUrlFromWorkspaceId(workspaceId: string): string {
+  return `https://${workspaceId}${BAILIAN_WORKSPACE_HOST_SUFFIX}`;
+}
+
 const CONFIG_JSON = `{
   "version": 1,
   "defaultModel": "openai/gpt-image-1.5",
@@ -42,23 +79,23 @@ const CONFIG_JSON = `{
       },
       "api_key": ["YOUR_GEMINI_API_KEY"]
     },
-    "seedream": {
+    "volcengine": {
       "enabled": true,
-      "apiBaseUrl": "https://ark.cn-beijing.volces.com/api/v3",
+      "apiBaseUrl": "__VOLCENGINE_BASE_URL__",
       "timeoutMs": 120000,
       "retryPolicy": {
         "maxAttempts": 2
       },
-      "api_key": ["YOUR_SEEDREAM_API_KEY"]
+      "api_key": ["YOUR_VOLCENGINE_API_KEY"]
     },
-    "qwen": {
+    "bailian": {
       "enabled": true,
-      "apiBaseUrl": "https://dashscope.aliyuncs.com/api/v1",
+      "apiBaseUrl": "__BAILIAN_BASE_URL__",
       "timeoutMs": 120000,
       "retryPolicy": {
         "maxAttempts": 2
       },
-      "api_key": ["YOUR_QWEN_API_KEY"]
+      "api_key": ["YOUR_DASHSCOPE_API_KEY"]
     },
     "minimax": {
       "enabled": true,
@@ -74,6 +111,11 @@ const CONFIG_JSON = `{
 `;
 
 const CONFIG_EXAMPLE_JSONC = `// Copy this file to config.json and remove comments.
+// volcengine supports two apiBaseUrl endpoints:
+//   api        -> https://ark.cn-beijing.volces.com/api/v3
+//   agent plan -> https://ark.cn-beijing.volces.com/api/plan/v3
+// bailian apiBaseUrl is workspace-specific:
+//   https://{workspaceId}.cn-beijing.maas.aliyuncs.com/api/v1
 ${CONFIG_JSON}`;
 
 const CONFIG_README = `# ~/.image
@@ -187,8 +229,8 @@ Model-list output prefers provider APIs when supported. Built-in model-list outp
 - \`chatgpt-image\` -> \`openai\`
 - \`openrouter-image\` -> \`openrouter\`
 - \`nano-banana\` -> \`gemini\`
-- \`doubao-seedream\` -> \`seedream\`
-- \`qwen-image\` -> \`qwen\`
+- \`doubao-seedream\` -> \`volcengine\`
+- \`dashscope\` -> \`bailian\`
 - \`minimax-image\` -> \`minimax\`
 `;
 
@@ -231,11 +273,21 @@ npm install -g @cp7553479/image-cli
 
 /**
  * buildConfigTemplates 的导出入口。
+ *
+ * `config.json` uses the resolved Volcengine base URL (chosen at init time).
+ * `config.example.jsonc` always shows the standard `api` endpoint with a note
+ * about the Agent Plan alternative, so the example stays stable reference.
  */
-export function buildConfigTemplates(): ConfigTemplates {
+export function buildConfigTemplates(options: ConfigTemplateOptions = {}): ConfigTemplates {
+  const volcengineBaseUrl = options.volcengineBaseUrl ?? VOLCENGINE_API_BASE_URL;
+  const bailianBaseUrl = options.bailianBaseUrl ?? BAILIAN_DEFAULT_BASE_URL;
   return {
-    config: CONFIG_JSON,
-    configExample: CONFIG_EXAMPLE_JSONC,
+    config: CONFIG_JSON
+      .replaceAll(VOLCENGINE_BASE_URL_SENTINEL, volcengineBaseUrl)
+      .replaceAll(BAILIAN_BASE_URL_SENTINEL, bailianBaseUrl),
+    configExample: CONFIG_EXAMPLE_JSONC
+      .replaceAll(VOLCENGINE_BASE_URL_SENTINEL, VOLCENGINE_API_BASE_URL)
+      .replaceAll(BAILIAN_BASE_URL_SENTINEL, BAILIAN_DEFAULT_BASE_URL),
     readme: CONFIG_README,
     skill: SKILL_MD,
     skillReadme: SKILL_README
@@ -245,8 +297,8 @@ export function buildConfigTemplates(): ConfigTemplates {
 /**
  * listConfigInitTemplateFiles 的导出入口。
  */
-export function listConfigInitTemplateFiles(): InitTemplateFile[] {
-  const templates = buildConfigTemplates();
+export function listConfigInitTemplateFiles(options: ConfigTemplateOptions = {}): InitTemplateFile[] {
+  const templates = buildConfigTemplates(options);
   return [
     { relativePath: "config.example.jsonc", contents: templates.configExample },
     { relativePath: "config.json", contents: templates.config },

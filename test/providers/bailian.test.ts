@@ -1,21 +1,21 @@
 import { describe, expect, test, vi } from "vitest";
 
-import { qwenProvider } from "../../src/providers/qwen/index.js";
+import { bailianProvider } from "../../src/providers/bailian/index.js";
 
 vi.mock("../../src/providers/image-input.js", () => ({
   resolveImageToDataUrl: vi.fn(async (input: { url?: string; file?: string }) =>
-    `data:image/png;base64,qwen-${input.url ?? input.file}`
+    `data:image/png;base64,bailian-${input.url ?? input.file}`
   )
 }));
 
-describe("qwen provider", () => {
+describe("bailian provider", () => {
   test("builds sync multimodal generation requests from OpenAI-compatible options", async () => {
-    const operation = await qwenProvider.buildGenerateOperation({
+    const operation = await bailianProvider.buildGenerateOperation({
       request: {
         prompt: "draw a cat",
         model: {
-          providerId: "qwen",
-          providerAlias: "qwen",
+          providerId: "bailian",
+          providerAlias: "bailian",
           modelId: "qwen-vl-max"
         },
         size: "2048x2048",
@@ -89,12 +89,12 @@ describe("qwen provider", () => {
   });
 
   test("keeps qwen-image versioned models on the sync endpoint", async () => {
-    const operation = await qwenProvider.buildGenerateOperation({
+    const operation = await bailianProvider.buildGenerateOperation({
       request: {
         prompt: "draw a cat",
         model: {
-          providerId: "qwen",
-          providerAlias: "qwen",
+          providerId: "bailian",
+          providerAlias: "bailian",
           modelId: "qwen-image-2.0-pro"
         },
         size: "1328x1328"
@@ -122,11 +122,11 @@ describe("qwen provider", () => {
   });
 
   test("polls async qwen-image tasks until success and returns urls", async () => {
-    const operation = await qwenProvider.buildGenerateOperation({
+    const operation = await bailianProvider.buildGenerateOperation({
       request: {
         prompt: "a poster",
         model: {
-          providerId: "qwen",
+          providerId: "bailian",
           providerAlias: "qwen-image",
           modelId: "qwen-image"
         }
@@ -230,11 +230,11 @@ describe("qwen provider", () => {
     });
     expect(finalResult.bodyText).toContain("SUCCEEDED");
 
-    const parsed = await qwenProvider.parseGenerateResponse(finalResult, {
+    const parsed = await bailianProvider.parseGenerateResponse(finalResult, {
       request: {
         prompt: "a poster",
         model: {
-          providerId: "qwen",
+          providerId: "bailian",
           providerAlias: "qwen-image",
           modelId: "qwen-image"
         }
@@ -265,24 +265,24 @@ describe("qwen provider", () => {
     });
   });
 
-  test("classifies qwen failures by status code", () => {
-    expect(qwenProvider.classifyFailure(makeFailureContext(400))).toEqual({
+  test("classifies bailian failures by status code", () => {
+    expect(bailianProvider.classifyFailure(makeFailureContext(400))).toEqual({
       kind: "non-retryable-request",
-      reason: "Qwen rejected the request with HTTP 400."
+      reason: "Bailian rejected the request with HTTP 400."
     });
-    expect(qwenProvider.classifyFailure(makeFailureContext(401))).toEqual({
+    expect(bailianProvider.classifyFailure(makeFailureContext(401))).toEqual({
       kind: "retryable-credential",
-      reason: "Qwen rejected credentials with HTTP 401."
+      reason: "Bailian rejected credentials with HTTP 401."
     });
-    expect(qwenProvider.classifyFailure(makeFailureContext(502))).toEqual({
+    expect(bailianProvider.classifyFailure(makeFailureContext(502))).toEqual({
       kind: "retryable-transport",
-      reason: "Qwen returned HTTP 502."
+      reason: "Bailian returned HTTP 502."
     });
   });
 
-  test("throws qwen error responses before extracting images", async () => {
+  test("throws bailian error responses before extracting images", async () => {
     await expect(
-      qwenProvider.parseGenerateResponse(
+      bailianProvider.parseGenerateResponse(
         {
           statusCode: 401,
           headers: {},
@@ -296,17 +296,17 @@ describe("qwen provider", () => {
         makeParseContext()
       )
     ).rejects.toThrow(
-      /Qwen request failed with HTTP 401: InvalidApiKey: Invalid API key/
+      /Bailian request failed with HTTP 401: InvalidApiKey: Invalid API key/
     );
   });
 
   test("appends reference images to sync multimodal content", async () => {
-    const operation = await qwenProvider.buildGenerateOperation({
+    const operation = await bailianProvider.buildGenerateOperation({
       request: {
         prompt: "keep the subject, change the background",
         model: {
-          providerId: "qwen",
-          providerAlias: "qwen",
+          providerId: "bailian",
+          providerAlias: "bailian",
           modelId: "qwen-vl-max"
         },
         reference_images: [{ url: "https://example.com/ref.png" }]
@@ -325,7 +325,7 @@ describe("qwen provider", () => {
     const json = operation.request.json as { input: { messages: Array<{ content: Array<Record<string, unknown>> }> } };
     const content = json.input.messages[0].content;
     expect(content[0]).toEqual({ text: "keep the subject, change the background" });
-    expect(content[1]).toEqual({ image: "data:image/png;base64,qwen-https://example.com/ref.png" });
+    expect(content[1]).toEqual({ image: "data:image/png;base64,bailian-https://example.com/ref.png" });
   });
 });
 
@@ -357,8 +357,8 @@ function makeParseContext() {
     request: {
       prompt: "draw a cat",
       model: {
-        providerId: "qwen",
-        providerAlias: "qwen",
+        providerId: "bailian",
+        providerAlias: "bailian",
         modelId: "qwen-vl-max"
       }
     },

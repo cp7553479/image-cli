@@ -78,9 +78,9 @@ export function aspectRatioFromOpenAIImageSize(size?: string): string | undefine
 }
 
 /**
- * Converts OpenAI-compatible image size notation to Qwen size notation.
+ * Converts OpenAI-compatible image size notation to Bailian (DashScope) size notation.
  */
-export function qwenSizeFromOpenAIImageSize(size?: string): string | undefined {
+export function bailianSizeFromOpenAIImageSize(size?: string): string | undefined {
   if (!size || size === "auto") {
     return undefined;
   }

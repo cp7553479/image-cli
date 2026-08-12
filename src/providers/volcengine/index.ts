@@ -15,11 +15,11 @@ const DEFAULT_BASE_URL = "https://ark.cn-beijing.volces.com/api/v3";
 const TEMPORARY_URL_WARNING = "Temporary URL; expires in 24 hours.";
 
 /**
- * seedreamProviderPlugin 的导出入口。
+ * volcengineProviderPlugin 的导出入口。
  */
-export const seedreamProviderPlugin: ProviderPlugin = {
-  providerId: "seedream",
-  aliases: getBuiltInProviderAliases("seedream"),
+export const volcengineProviderPlugin: ProviderPlugin = {
+  providerId: "volcengine",
+  aliases: getBuiltInProviderAliases("volcengine"),
   capabilities: {
     generate: true,
     edit: true,
@@ -50,7 +50,7 @@ export const seedreamProviderPlugin: ProviderPlugin = {
     input: ProviderGenerateContext
   ) {
     const payload = parsePayload(result.bodyText, result.statusCode >= 400);
-    assertSuccessfulResponse("Seedream", result, payload);
+    assertSuccessfulResponse("Volcengine", result, payload);
 
     const items = extractResponseItems(payload);
 
@@ -60,7 +60,7 @@ export const seedreamProviderPlugin: ProviderPlugin = {
     );
 
     return {
-      providerId: "seedream",
+      providerId: "volcengine",
       modelId: input.request.model.modelId,
       images,
       warnings,
@@ -75,34 +75,34 @@ export const seedreamProviderPlugin: ProviderPlugin = {
     if (statusCode === 400) {
       return {
         kind: "non-retryable-request",
-        reason: message || "Seedream rejected the request body."
+        reason: message || "Volcengine rejected the request body."
       };
     }
 
     if (statusCode === 401 || statusCode === 403 || statusCode === 429) {
       return {
         kind: "retryable-credential",
-        reason: message || `Seedream returned HTTP ${statusCode}.`
+        reason: message || `Volcengine returned HTTP ${statusCode}.`
       };
     }
 
     if (typeof statusCode === "number" && statusCode >= 500) {
       return {
         kind: "retryable-transport",
-        reason: message || `Seedream returned HTTP ${statusCode}.`
+        reason: message || `Volcengine returned HTTP ${statusCode}.`
       };
     }
 
     if (statusCode !== undefined && statusCode >= 400) {
       return {
         kind: "non-retryable-request",
-        reason: message || `Seedream returned HTTP ${statusCode}.`
+        reason: message || `Volcengine returned HTTP ${statusCode}.`
       };
     }
 
     return {
       kind: "unknown",
-      reason: message || "Seedream failure classification was inconclusive."
+      reason: message || "Volcengine failure classification was inconclusive."
     };
   }
 };
@@ -131,7 +131,7 @@ async function buildRequestBody(input: ProviderGenerateContext): Promise<Record<
 
   const referenceImages = input.request.reference_images;
   if (referenceImages && referenceImages.length > 0) {
-    body.image = await resolveSeedreamReferenceImages(referenceImages);
+    body.image = await resolveVolcengineReferenceImages(referenceImages);
   }
 
   return body;
@@ -141,7 +141,7 @@ async function buildRequestBody(input: ProviderGenerateContext): Promise<Record<
  * 火山方舟 image 字段接受 URL 或 base64；本地文件/远程 URL 统一解析。
  * 多图融合传字符串数组，单图传字符串。
  */
-async function resolveSeedreamReferenceImages(
+async function resolveVolcengineReferenceImages(
   referenceImages: NonNullable<ProviderGenerateContext["request"]["reference_images"]>
 ): Promise<string | string[]> {
   const images = await resolveImages(referenceImages);
@@ -189,57 +189,14 @@ function parsePayload(bodyText: string, tolerateInvalid = false): unknown {
 }
 
 function extractResponseItems(payload: unknown): unknown[] {
-  if (!payload || typeof payload !== "object") {
-    return [];
+  // Volcengine always returns { data: [...] }; confirmed against the live API.
+  if (payload && typeof payload === "object" && Array.isArray((payload as { data?: unknown }).data)) {
+    return (payload as { data: unknown[] }).data;
   }
-
-  const candidate = payload as {
-    data?: unknown;
-    images?: unknown;
-    image?: unknown;
-  };
-
-  if (Array.isArray(candidate.data)) {
-    return candidate.data;
-  }
-
-  if (Array.isArray(candidate.images)) {
-    return candidate.images;
-  }
-
-  if (Array.isArray(candidate.image)) {
-    return candidate.image;
-  }
-
-  if (candidate.data && typeof candidate.data === "object") {
-    return [candidate.data];
-  }
-
-  if (candidate.images && typeof candidate.images === "object") {
-    return [candidate.images];
-  }
-
   return [];
 }
 
 function mapImageResult(item: unknown): ProviderImageResult | null {
-  if (typeof item === "string") {
-    if (item.startsWith("data:")) {
-      const parsed = parseDataUrl(item);
-      return {
-        output_format: "b64_json",
-        mimeType: parsed.mimeType,
-        dataBase64: parsed.base64Data
-      };
-    }
-
-    return {
-      output_format: "url",
-      url: item,
-      warnings: [TEMPORARY_URL_WARNING]
-    };
-  }
-
   if (!item || typeof item !== "object") {
     return null;
   }
@@ -254,44 +211,15 @@ function mapImageResult(item: unknown): ProviderImageResult | null {
     };
   }
 
-  const base64Data =
-    readString(record.b64_json) ??
-    readString(record.base64_json) ??
-    readString(record.b64Json);
+  const base64Data = readString(record.b64_json);
   if (base64Data) {
     return {
       output_format: "b64_json",
-      mimeType: readString(record.mime_type) ?? readString(record.mimeType),
       dataBase64: base64Data
     };
   }
 
-  const dataUrl = readString(record.data_url) ?? readString(record.dataUrl);
-  if (dataUrl) {
-    const parsed = parseDataUrl(dataUrl);
-    return {
-      output_format: "b64_json",
-      mimeType: parsed.mimeType,
-      dataBase64: parsed.base64Data
-    };
-  }
-
   return null;
-}
-
-function parseDataUrl(value: string): { mimeType: string; base64Data: string } {
-  const match = value.match(/^data:([^;,]+)?(?:;charset=[^;,]+)?;base64,(.+)$/);
-  if (!match) {
-    return {
-      mimeType: "application/octet-stream",
-      base64Data: value
-    };
-  }
-
-  return {
-    mimeType: match[1] || "application/octet-stream",
-    base64Data: match[2]
-  };
 }
 
 function extractUsage(payload: unknown): Record<string, unknown> | undefined {
@@ -332,4 +260,4 @@ function joinUrl(baseUrl: string, path: string): string {
   return new URL(path, normalizedBase).toString();
 }
 
-export default seedreamProviderPlugin;
+export default volcengineProviderPlugin;

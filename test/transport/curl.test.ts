@@ -71,6 +71,29 @@ describe("curl transport", () => {
     });
   });
 
+  test("does not duplicate a caller-supplied content-type header", async () => {
+    const server = createServer(async (request, response) => {
+      response.setHeader("content-type", "application/json");
+      response.end(JSON.stringify({ contentType: request.headers["content-type"] }));
+    });
+    const baseUrl = await listen(server);
+
+    const result = await executeCurlRequest({
+      method: "POST",
+      url: `${baseUrl}/json`,
+      headers: {
+        Authorization: "Bearer test-key",
+        "Content-Type": "application/json"
+      },
+      json: { prompt: "cat" },
+      timeoutMs: 5_000
+    });
+
+    expect(result.statusCode).toBe(200);
+    // Duplicated headers would arrive as "application/json,application/json".
+    expect(JSON.parse(result.bodyText)).toEqual({ contentType: "application/json" });
+  });
+
   test("executes multipart requests with file uploads", async () => {
     const uploadPath = path.join(tmpdir(), `image-cli-upload-${Date.now()}.txt`);
     await writeFile(uploadPath, "demo-file");

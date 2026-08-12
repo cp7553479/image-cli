@@ -66,12 +66,12 @@ const FALLBACK_MODELS: Record<string, ProviderModelEntry[]> = {
     { id: "gemini-3.1-flash-image" },
     { id: "gemini-3.1-flash-image-preview" }
   ],
-  seedream: [
+  volcengine: [
     { id: "doubao-seedream-5.0-lite" },
     { id: "doubao-seedream-4-5-251128" },
     { id: "doubao-seedream-4.5" }
   ],
-  qwen: [
+  bailian: [
     { id: "qwen-image-2.0-pro" },
     { id: "qwen-image-2.0-pro-2026-03-03" },
     { id: "qwen-image-2.0" },

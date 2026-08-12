@@ -1,8 +1,8 @@
 import openaiProviderPlugin from "./openai/index.js";
 import openrouterProviderPlugin from "./openrouter/index.js";
 import geminiProvider from "./gemini/index.js";
-import seedreamProviderPlugin from "./seedream/index.js";
-import qwenProvider from "./qwen/index.js";
+import volcengineProviderPlugin from "./volcengine/index.js";
+import bailianProvider from "./bailian/index.js";
 import minimaxProviderPlugin from "./minimax/index.js";
 import { findPluginProvider, loadPluginManifests } from "../plugins/loader.js";
 
@@ -12,8 +12,8 @@ const PROVIDERS: Record<string, ProviderPlugin> = {
   openai: openaiProviderPlugin,
   openrouter: openrouterProviderPlugin,
   gemini: geminiProvider,
-  seedream: seedreamProviderPlugin,
-  qwen: qwenProvider,
+  volcengine: volcengineProviderPlugin,
+  bailian: bailianProvider,
   minimax: minimaxProviderPlugin
 };
 

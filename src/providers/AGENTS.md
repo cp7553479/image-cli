@@ -19,9 +19,9 @@ Reference image field mapping by provider:
   and scalar fields become form text fields.
 - `gemini`: appends `{inlineData:{mimeType,data}}` parts to
   `contents[0].parts` alongside the text part.
-- `seedream`: sets the `image` body field on `images/generations` (string for
+- `volcengine`: sets the `image` body field on `images/generations` (string for
   one image, string array for multi-image fusion).
-- `qwen`: appends `{image: dataURL}` entries to the sync multimodal
+- `bailian`: appends `{image: dataURL}` entries to the sync multimodal
   `input.messages[0].content` array.
 - `minimax`: maps to `subject_reference: [{type:"character", image_file: dataURL}]`.
 - `openrouter`: switches `messages[0].content` to a multimodal array

@@ -3,7 +3,9 @@ import { describe, expect, test } from "vitest";
 import {
   buildConfigTemplates,
   listConfigInitTemplateFiles,
-  listSkillInitTemplateFiles
+  listSkillInitTemplateFiles,
+  VOLCENGINE_AGENT_PLAN_BASE_URL,
+  VOLCENGINE_API_BASE_URL
 } from "../../src/config/init-templates.js";
 
 describe("config templates", () => {
@@ -14,6 +16,9 @@ describe("config templates", () => {
     expect(templates.configExample).toContain('"defaultModel": "openai/gpt-image-1.5"');
     expect(templates.configExample).toContain("// Copy this file to config.json");
     expect(templates.configExample).toContain('"api_key": ["YOUR_OPENAI_API_KEY"]');
+    expect(templates.config).toContain('"volcengine"');
+    expect(templates.config).toContain(VOLCENGINE_API_BASE_URL);
+    expect(templates.config).not.toContain("__VOLCENGINE_BASE_URL__");
     expect(templates.readme).toContain("image config init");
     expect(templates.readme).toContain("~/.codex/skills");
     expect(templates.readme).toContain("~/antigravity/skills");
@@ -36,5 +41,19 @@ describe("config templates", () => {
       "README.md",
       "SKILL.md"
     ]);
+  });
+
+  test("bakes the chosen volcengine base url into config.json", () => {
+    const templates = buildConfigTemplates({ volcengineBaseUrl: VOLCENGINE_AGENT_PLAN_BASE_URL });
+
+    expect(templates.config).toContain(VOLCENGINE_AGENT_PLAN_BASE_URL);
+    expect(templates.config).not.toContain("__VOLCENGINE_BASE_URL__");
+    // config.json must not fall back to the api endpoint when agent plan is chosen.
+    expect(templates.config).not.toContain(`"apiBaseUrl": "${VOLCENGINE_API_BASE_URL}"`);
+
+    // The example always shows the standard api endpoint as the active value.
+    const defaultTemplates = buildConfigTemplates();
+    expect(defaultTemplates.config).toContain(`"apiBaseUrl": "${VOLCENGINE_API_BASE_URL}"`);
+    expect(defaultTemplates.configExample).toContain(VOLCENGINE_API_BASE_URL);
   });
 });

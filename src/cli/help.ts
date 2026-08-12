@@ -31,23 +31,22 @@ Generate images.
 
 Options:
   --model <provider/model>           defaults to config.defaultModel when omitted
-  --size <auto|WIDTHxHEIGHT>         output size
+  --size <value>                     output size (e.g. auto, 1024x1024, 2K); passed through as-is
   --n <count>                        output count
   --quality <value>                  image quality
-  --background <auto|opaque|transparent>
-                                      background mode
-  --output-format <png|jpeg|webp>    preferred output format
-  --output-compression <0-100>       compression level for jpeg or webp outputs
-  --moderation <auto|low>            moderation strictness
-  --response-format <url|b64_json>   response format
+  --background <value>               background mode
+  --output-format <value>            preferred output format (e.g. png, jpeg, webp)
+  --output-compression <value>       compression level for jpeg or webp outputs
+  --moderation <value>               moderation strictness
+  --response-format <value>          response format (e.g. url, b64_json)
   --stream                           stream when supported
   --partial-images <count>           partial streamed image count
-  --style <vivid|natural>            image style
+  --style <value>                    image style
   --user <id>                        end-user identifier
   --reference-image <path|url>       reference image; repeat to pass multiple (image-to-image)
   --mask <path|url>                  edit mask (PNG, transparent areas are editable)
-  --input-fidelity <low|high>        fidelity to reference image (gpt-image)
-  --extra <json>                     provider-specific JSON options; cannot override standard fields
+  --input-fidelity <value>           fidelity to reference image (gpt-image)
+  --extra <json>                     provider-specific JSON options; explicit flags take precedence
   --output-dir <path>                directory for saved outputs; default is ./image-output/<timestamp>/
   --json                             print JSON manifest
   -h, --help                         display help for command

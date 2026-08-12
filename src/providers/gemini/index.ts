@@ -27,14 +27,10 @@ const DEFAULT_BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
 const SYNTHID_WARNING = "Gemini-generated images are SynthID watermarked.";
 
 type GeminiInlineDataPart = {
-  inlineData?: GeminiInlineData;
-  inline_data?: GeminiInlineData;
-};
-
-type GeminiInlineData = {
-  mimeType?: string;
-  mime_type?: string;
-  data?: string;
+  inlineData?: {
+    mimeType?: string;
+    data?: string;
+  };
 };
 
 type GeminiResponse = {
@@ -224,28 +220,13 @@ function extractInlineImage(part: GeminiInlineDataPart | undefined): {
   mimeType?: string;
   dataBase64?: string;
 } | null {
-  if (!part) {
+  // Gemini REST returns camelCase inlineData/mimeType; confirmed against the live API.
+  if (!part?.inlineData?.data) {
     return null;
-  }
-
-  const inlineData = "inlineData" in part
-    ? part.inlineData
-    : "inline_data" in part
-      ? part.inline_data
-      : undefined;
-  if (!inlineData?.data) {
-    return null;
-  }
-
-  if ("mimeType" in inlineData) {
-    return {
-      mimeType: inlineData.mimeType,
-      dataBase64: inlineData.data
-    };
   }
 
   return {
-    mimeType: inlineData.mime_type,
-    dataBase64: inlineData.data
+    mimeType: part.inlineData.mimeType,
+    dataBase64: part.inlineData.data
   };
 }

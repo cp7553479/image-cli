@@ -1,6 +1,10 @@
-This module owns Volcengine Seedream mapping.
+This module owns Volcengine (Ark / Doubao Seedream) image generation mapping.
 
-- Map OpenAI-compatible generation fields to Seedream request fields.
+- Map OpenAI-compatible generation fields to Volcengine Ark request fields.
+- The provider supports two base URLs, chosen at `config init` time:
+  - `api`        -> `https://ark.cn-beijing.volces.com/api/v3`
+  - `agent plan` -> `https://ark.cn-beijing.volces.com/api/plan/v3`
+  Only the base URL differs; request/response handling is identical.
 - Keep provider-native sequential generation derived from `n`.
 - Reference images (image-to-image / multi-image fusion) are set on the
   `image` body field of `images/generations`: a single data URL string for one

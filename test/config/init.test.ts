@@ -36,6 +36,12 @@ describe("config init", () => {
     }));
     expect(await readFile(paths.configFile, "utf8")).toContain('"defaultModel": "openai/gpt-image-1.5"');
     expect(await readFile(paths.configFile, "utf8")).toContain('"api_key": ["YOUR_OPENAI_API_KEY"]');
+    // Non-interactive init defaults volcengine to the api endpoint.
+    expect(await readFile(paths.configFile, "utf8")).toContain("https://ark.cn-beijing.volces.com/api/v3");
+    expect(await readFile(paths.configFile, "utf8")).not.toContain("__VOLCENGINE_BASE_URL__");
+    // Non-interactive init writes a bailian workspaceId placeholder.
+    expect(await readFile(paths.configFile, "utf8")).toContain("YOUR_WORKSPACE_ID");
+    expect(await readFile(paths.configFile, "utf8")).not.toContain("__BAILIAN_BASE_URL__");
     expect(await readFile(paths.readmeFile, "utf8")).toContain("config.json");
     expect(await readFile(path.join(paths.skillInstallDirs[0], "SKILL.md"), "utf8")).toContain("If this skill is missing or unavailable");
     expect(await readFile(path.join(paths.skillInstallDirs[0], "README.md"), "utf8")).toContain("image config init");
@@ -99,6 +105,34 @@ describe("config init", () => {
     expect(await readFile(path.join(paths.skillInstallDirs[1], "README.md"), "utf8")).toContain("image config init");
   });
 });
+
+  test("writes the chosen volcengine base url when provided", async () => {
+    const homeDir = await makeTempHome("image-cli-init-volcengine-endpoint");
+    const paths = getImageConfigPaths(homeDir);
+    await initImageConfigDirectory({
+      homeDir,
+      volcengineBaseUrl: "https://ark.cn-beijing.volces.com/api/plan/v3"
+    });
+
+    const configText = await readFile(paths.configFile, "utf8");
+    expect(configText).toContain("https://ark.cn-beijing.volces.com/api/plan/v3");
+    expect(configText).not.toContain("https://ark.cn-beijing.volces.com/api/v3\"");
+    expect(configText).not.toContain("__VOLCENGINE_BASE_URL__");
+  });
+
+  test("writes the workspace-derived bailian base url when provided", async () => {
+    const homeDir = await makeTempHome("image-cli-init-bailian-workspace");
+    const paths = getImageConfigPaths(homeDir);
+    await initImageConfigDirectory({
+      homeDir,
+      bailianBaseUrl: "https://llm-test123.cn-beijing.maas.aliyuncs.com/api/v1"
+    });
+
+    const configText = await readFile(paths.configFile, "utf8");
+    expect(configText).toContain("https://llm-test123.cn-beijing.maas.aliyuncs.com/api/v1");
+    expect(configText).not.toContain("YOUR_WORKSPACE_ID");
+    expect(configText).not.toContain("__BAILIAN_BASE_URL__");
+  });
 
 async function makeTempHome(prefix: string): Promise<string> {
   const baseDir = path.join(tmpdir(), prefix, `${Date.now()}-${Math.random().toString(16).slice(2)}`);

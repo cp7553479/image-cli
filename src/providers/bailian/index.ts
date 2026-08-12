@@ -15,7 +15,7 @@ import type {
 import { getBuiltInProviderAliases } from "../identity.js";
 import {
   collectOpenAIImageRequestFields,
-  qwenSizeFromOpenAIImageSize
+  bailianSizeFromOpenAIImageSize
 } from "../openai-image-options.js";
 import {
   assertSuccessfulResponse,
@@ -23,7 +23,11 @@ import {
 } from "../response.js";
 import { resolveImageToDataUrl } from "../image-input.js";
 
-/** Qwen API 默认基地址。用于拼接同步/异步端点。 */
+/**
+ * Bailian (阿里云百炼 / DashScope MaaS) 共享端点，作为 config 未配置 apiBaseUrl
+ * 时的兜底。生产配置应使用 workspace 专属域名：
+ *   https://{workspaceId}.cn-beijing.maas.aliyuncs.com/api/v1
+ */
 const DEFAULT_BASE_URL = "https://dashscope.aliyuncs.com/api/v1";
 const SYNC_ENDPOINT = "/services/aigc/multimodal-generation/generation";
 const ASYNC_ENDPOINT = "/services/aigc/text2image/image-synthesis";
@@ -34,7 +38,7 @@ const ASYNC_HEADER_VALUE = "enable";
 const MAX_POLL_ATTEMPTS = 30;
 const ASYNC_MODEL_IDS = new Set(["qwen-image", "qwen-image-plus"]);
 
-type QwenResponse = {
+type BailianResponse = {
   usage?: Record<string, unknown>;
   output?: {
     choices?: Array<{
@@ -55,11 +59,11 @@ type QwenResponse = {
 };
 
 /**
- * qwenProvider 的导出入口。
+ * bailianProvider 的导出入口。
  */
-export const qwenProvider: ProviderPlugin = {
-  providerId: "qwen",
-  aliases: getBuiltInProviderAliases("qwen"),
+export const bailianProvider: ProviderPlugin = {
+  providerId: "bailian",
+  aliases: getBuiltInProviderAliases("bailian"),
   capabilities: {
     generate: true,
     edit: true,
@@ -81,12 +85,12 @@ export const qwenProvider: ProviderPlugin = {
     input: ProviderGenerateContext
   ): Promise<GenerateResult> {
     const payload = parseJsonResponse(result.bodyText, result.statusCode >= 400);
-    assertSuccessfulResponse("Qwen", result, payload);
+    assertSuccessfulResponse("Bailian", result, payload);
 
     const images = extractImages(payload);
 
     return {
-      providerId: "qwen",
+      providerId: "bailian",
       modelId: input.request.model.modelId,
       images,
       warnings: [],
@@ -100,27 +104,27 @@ export const qwenProvider: ProviderPlugin = {
     if (statusCode === 400) {
       return {
         kind: "non-retryable-request",
-        reason: "Qwen rejected the request with HTTP 400."
+        reason: "Bailian rejected the request with HTTP 400."
       };
     }
 
     if (statusCode === 401 || statusCode === 403 || statusCode === 429) {
       return {
         kind: "retryable-credential",
-        reason: `Qwen rejected credentials with HTTP ${statusCode}.`
+        reason: `Bailian rejected credentials with HTTP ${statusCode}.`
       };
     }
 
     if (statusCode >= 500 && statusCode <= 599) {
       return {
         kind: "retryable-transport",
-        reason: `Qwen returned HTTP ${statusCode}.`
+        reason: `Bailian returned HTTP ${statusCode}.`
       };
     }
 
     return {
       kind: "unknown",
-      reason: context.error instanceof Error ? context.error.message : "Unknown Qwen failure."
+      reason: context.error instanceof Error ? context.error.message : "Unknown Bailian failure."
     };
   }
 };
@@ -170,11 +174,11 @@ function buildAsyncOperation(input: ProviderGenerateContext): ProviderOperation 
         initialResult.bodyText,
         initialResult.statusCode >= 400
       );
-      assertSuccessfulResponse("Qwen", initialResult, initialPayload);
+      assertSuccessfulResponse("Bailian", initialResult, initialPayload);
 
       const taskId = initialPayload.output?.task_id?.trim();
       if (!taskId) {
-        throw new Error("Qwen async response did not include a task_id.");
+        throw new Error("Bailian async response did not include a task_id.");
       }
 
       let currentResult = initialResult;
@@ -183,7 +187,7 @@ function buildAsyncOperation(input: ProviderGenerateContext): ProviderOperation 
           currentResult.bodyText,
           currentResult.statusCode >= 400
         );
-        assertSuccessfulResponse("Qwen", currentResult, currentPayload);
+        assertSuccessfulResponse("Bailian", currentResult, currentPayload);
 
         const taskStatus = currentPayload.output?.task_status?.trim();
 
@@ -196,13 +200,13 @@ function buildAsyncOperation(input: ProviderGenerateContext): ProviderOperation 
           const message = currentPayload.output?.message;
           throw new Error(
             code || message
-              ? `Qwen task ${taskId} ${taskStatus.toLowerCase()}: ${[code, message].filter(Boolean).join(": ")}`
-              : `Qwen task ${taskId} ${taskStatus.toLowerCase()}.`
+              ? `Bailian task ${taskId} ${taskStatus.toLowerCase()}: ${[code, message].filter(Boolean).join(": ")}`
+              : `Bailian task ${taskId} ${taskStatus.toLowerCase()}.`
           );
         }
 
         if (taskStatus !== "PENDING" && taskStatus !== "RUNNING" && attempt === 0) {
-          throw new Error(`Qwen task ${taskId} returned unknown status "${taskStatus ?? ""}".`);
+          throw new Error(`Bailian task ${taskId} returned unknown status "${taskStatus ?? ""}".`);
         }
 
         const pollResult = await tools.execute({
@@ -215,7 +219,7 @@ function buildAsyncOperation(input: ProviderGenerateContext): ProviderOperation 
         currentResult = pollResult;
       }
 
-      throw new Error(`Qwen task ${taskId} did not complete within ${MAX_POLL_ATTEMPTS} polls.`);
+      throw new Error(`Bailian task ${taskId} did not complete within ${MAX_POLL_ATTEMPTS} polls.`);
     }
   };
 }
@@ -262,7 +266,7 @@ function buildParameters(request: GenerateRequest): Record<string, unknown> {
     })
   };
 
-  const size = qwenSizeFromOpenAIImageSize(request.size);
+  const size = bailianSizeFromOpenAIImageSize(request.size);
   if (size) {
     parameters.size = size;
   }
@@ -278,14 +282,14 @@ function shouldUseAsyncPath(modelId: string): boolean {
   return ASYNC_MODEL_IDS.has(modelId);
 }
 
-function parseJsonResponse(bodyText: string, tolerateInvalid = false): QwenResponse {
-  return parseProviderJsonBody<QwenResponse>("Qwen", bodyText, {
+function parseJsonResponse(bodyText: string, tolerateInvalid = false): BailianResponse {
+  return parseProviderJsonBody<BailianResponse>("Bailian", bodyText, {
     allowEmpty: tolerateInvalid,
     tolerateInvalid
   });
 }
 
-function extractImages(payload: QwenResponse): ProviderImageResult[] {
+function extractImages(payload: BailianResponse): ProviderImageResult[] {
   const asyncResults = payload.output?.results ?? [];
   if (asyncResults.length > 0) {
     return asyncResults.flatMap((result: { url?: string }) => {
@@ -322,4 +326,4 @@ function normalizeBaseUrl(value: string): string {
   return trimmed.endsWith("/") ? trimmed.slice(0, -1) : trimmed;
 }
 
-export default qwenProvider;
+export default bailianProvider;

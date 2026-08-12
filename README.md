@@ -15,8 +15,8 @@ Built-in providers:
 - OpenAI
 - OpenRouter
 - Gemini
-- Seedream
-- Qwen
+- Volcengine (Ark / Doubao Seedream)
+- Bailian (Alibaba Cloud / DashScope)
 - MiniMax
 
 Custom providers can be installed under `~/.image/plugins/`.

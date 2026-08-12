@@ -31,8 +31,9 @@
     "cli",
     "openai",
     "gemini",
-    "qwen",
-    "seedream",
+    "bailian",
+    "dashscope",
+    "volcengine",
     "minimax"
   ],
   "author": "cp7553479",

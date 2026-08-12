@@ -10,8 +10,8 @@ OpenAI-compatible 图片生成请求路由到不同 provider，保存输出文�
 - OpenAI
 - OpenRouter
 - Gemini
-- Seedream
-- Qwen
+- Volcengine（火山方舟 / Doubao Seedream）
+- Bailian（阿里云百炼 / DashScope）
 - MiniMax
 
 也支持安装在 `~/.image/plugins/` 下的自定义 provider。

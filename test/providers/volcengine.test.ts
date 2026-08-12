@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
 
-import { seedreamProviderPlugin } from "../../src/providers/seedream/index.js";
+import { volcengineProviderPlugin } from "../../src/providers/volcengine/index.js";
 import type { ProviderGenerateContext } from "../../src/providers/types.js";
 import type { CurlExecutionResult } from "../../src/transport/curl.js";
 
@@ -10,14 +10,14 @@ vi.mock("../../src/providers/image-input.js", () => ({
   )
 }));
 
-describe("seedream provider", () => {
+describe("volcengine provider", () => {
   test("defaults to watermark disabled and allows explicit watermark", async () => {
-    const defaultOperation = await seedreamProviderPlugin.buildGenerateOperation(makeContext());
+    const defaultOperation = await volcengineProviderPlugin.buildGenerateOperation(makeContext());
     expect(defaultOperation.request.json).toMatchObject({
       watermark: false
     });
 
-    const explicitOperation = await seedreamProviderPlugin.buildGenerateOperation(
+    const explicitOperation = await volcengineProviderPlugin.buildGenerateOperation(
       makeContext({
         request: {
           extra: {
@@ -49,7 +49,7 @@ describe("seedream provider", () => {
       }
     });
 
-    const operation = await seedreamProviderPlugin.buildGenerateOperation(input);
+    const operation = await volcengineProviderPlugin.buildGenerateOperation(input);
 
     expect(operation.request).toEqual({
       method: "POST",
@@ -82,7 +82,7 @@ describe("seedream provider", () => {
   });
 
   test("parses url and base64 responses and preserves temporary-url warnings", async () => {
-    const result = await seedreamProviderPlugin.parseGenerateResponse(
+    const result = await volcengineProviderPlugin.parseGenerateResponse(
       {
         statusCode: 200,
         headers: {},
@@ -106,7 +106,7 @@ describe("seedream provider", () => {
     );
 
     expect(result).toEqual({
-      providerId: "seedream",
+      providerId: "volcengine",
       modelId: "doubao-seedream-4.5",
       images: [
         {
@@ -141,7 +141,7 @@ describe("seedream provider", () => {
 
   test("classifies request, credential, and transport failures", () => {
     expect(
-      seedreamProviderPlugin.classifyFailure({
+      volcengineProviderPlugin.classifyFailure({
         error: new Error("bad request"),
         response: makeResponse(400)
       })
@@ -151,7 +151,7 @@ describe("seedream provider", () => {
     });
 
     expect(
-      seedreamProviderPlugin.classifyFailure({
+      volcengineProviderPlugin.classifyFailure({
         error: new Error("rate limited"),
         response: makeResponse(429)
       })
@@ -161,7 +161,7 @@ describe("seedream provider", () => {
     });
 
     expect(
-      seedreamProviderPlugin.classifyFailure({
+      volcengineProviderPlugin.classifyFailure({
         error: new Error("server error"),
         response: makeResponse(503)
       })
@@ -171,9 +171,9 @@ describe("seedream provider", () => {
     });
   });
 
-  test("throws seedream error responses before extracting images", async () => {
+  test("throws volcengine error responses before extracting images", async () => {
     await expect(
-      seedreamProviderPlugin.parseGenerateResponse(
+      volcengineProviderPlugin.parseGenerateResponse(
         {
           statusCode: 429,
           headers: {},
@@ -189,12 +189,12 @@ describe("seedream provider", () => {
         makeContext()
       )
     ).rejects.toThrow(
-      /Seedream request failed with HTTP 429: rate_limit_exceeded: Too many requests/
+      /Volcengine request failed with HTTP 429: rate_limit_exceeded: Too many requests/
     );
   });
 
   test("injects reference images into the image field as data URLs", async () => {
-    const operation = await seedreamProviderPlugin.buildGenerateOperation(
+    const operation = await volcengineProviderPlugin.buildGenerateOperation(
       makeContext({
         request: {
           reference_images: [{ url: "https://example.com/ref.png" }]
@@ -207,7 +207,7 @@ describe("seedream provider", () => {
   });
 
   test("passes multiple reference images as an array", async () => {
-    const operation = await seedreamProviderPlugin.buildGenerateOperation(
+    const operation = await volcengineProviderPlugin.buildGenerateOperation(
       makeContext({
         request: {
           reference_images: [
@@ -256,8 +256,8 @@ function makeContext(overrides: ContextOverrides = {}): ProviderGenerateContext 
     request: {
       prompt: "a calm product scene",
       model: {
-        providerId: "seedream",
-        providerAlias: "seedream",
+        providerId: "volcengine",
+        providerAlias: "volcengine",
         modelId: "doubao-seedream-4.5"
       },
       size: "2048x2048",

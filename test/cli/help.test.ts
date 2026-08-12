@@ -25,14 +25,14 @@ describe("CLI help", () => {
     const generateHelp = program.commands.find((command) => command.name() === "generate")?.helpInformation();
 
     expect(generateHelp).toContain("--model <provider/model>");
-    expect(generateHelp).toContain("--size <auto|WIDTHxHEIGHT>");
-    expect(generateHelp).toContain("--output-format <png|jpeg|webp>");
-    expect(generateHelp).toContain("--output-compression <0-100>");
-    expect(generateHelp).toContain("--response-format <url|b64_json>");
+    expect(generateHelp).toContain("--size <value>");
+    expect(generateHelp).toContain("--output-format <value>");
+    expect(generateHelp).toContain("--output-compression <value>");
+    expect(generateHelp).toContain("--response-format <value>");
     expect(generateHelp).toContain("--extra <json>");
     expect(generateHelp).toContain("--reference-image <path|url>");
     expect(generateHelp).toContain("--mask <path|url>");
-    expect(generateHelp).toContain("--input-fidelity <low|high>");
+    expect(generateHelp).toContain("--input-fidelity <value>");
     expect(generateHelp).toContain("print JSON manifest");
     expect(generateHelp).toContain("Usage: image generate <prompt>");
     expect(generateHelp).toContain("config.defaultModel");
@@ -86,9 +86,9 @@ describe("CLI help", () => {
           apiBaseUrl: "https://api.openai.com/v1",
           credentials: [{ present: true }]
         },
-        qwen: {
+        bailian: {
           enabled: false,
-          apiBaseUrl: "https://dashscope.aliyuncs.com/api/v1",
+          apiBaseUrl: "https://llm-test.cn-beijing.maas.aliyuncs.com/api/v1",
           credentials: []
         }
       }
@@ -97,7 +97,7 @@ describe("CLI help", () => {
     expect(output).toBe([
       "default=openai/gpt-image-1.5",
       "openai credentials=1 baseUrl=https://api.openai.com/v1",
-      "qwen disabled credentials=0 baseUrl=https://dashscope.aliyuncs.com/api/v1",
+      "bailian disabled credentials=0 baseUrl=https://llm-test.cn-beijing.maas.aliyuncs.com/api/v1",
       ""
     ].join("\n"));
   });

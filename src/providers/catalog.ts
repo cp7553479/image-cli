@@ -28,16 +28,16 @@ export const PROVIDER_CATALOG = [
     description: "Gemini native image generation"
   },
   {
-    providerId: "seedream",
+    providerId: "volcengine",
     aliases: ["doubao-seedream"],
     defaultBaseUrl: "https://ark.cn-beijing.volces.com/api/v3",
-    description: "Volcengine Ark Seedream"
+    description: "Volcengine Ark (Doubao Seedream)"
   },
   {
-    providerId: "qwen",
-    aliases: ["qwen-image"],
+    providerId: "bailian",
+    aliases: ["dashscope"],
     defaultBaseUrl: "https://dashscope.aliyuncs.com/api/v1",
-    description: "Alibaba Qwen image generation"
+    description: "Alibaba Cloud Bailian (DashScope) image generation"
   },
   {
     providerId: "minimax",

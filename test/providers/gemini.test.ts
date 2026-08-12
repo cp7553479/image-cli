@@ -136,8 +136,8 @@ describe("gemini provider", () => {
               content: {
                 parts: [
                   {
-                    inline_data: {
-                      mime_type: "image/png",
+                    inlineData: {
+                      mimeType: "image/png",
                       data: "YWJjMTIz"
                     }
                   }

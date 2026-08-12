@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { parseModelRef } from "./model-ref.js";
-import type { GenerateRequest, ImageInput, ImageInputFidelity } from "./request.js";
+import type { GenerateRequest, ImageInput } from "./request.js";
 
 type RawGenerateOptions = {
   model?: string;
@@ -28,30 +28,13 @@ type BuildGenerateRequestDefaults = {
   defaultModel?: string;
 };
 
-const RESERVED_EXTRA_KEYS = new Set([
-  "prompt",
-  "model",
-  "size",
-  "n",
-  "quality",
-  "background",
-  "output_format",
-  "output_compression",
-  "moderation",
-  "response_format",
-  "stream",
-  "partial_images",
-  "style",
-  "user",
-  "outputDir",
-  "json",
-  "reference_image",
-  "mask",
-  "input_fidelity"
-]);
-
 /**
- * Builds a validated OpenAI-compatible image generation request.
+ * Builds a generate request by passing flag values through verbatim.
+ *
+ * Value choices (sizes, enums, numeric ranges) are NOT validated here. The CLI
+ * only parses the model reference, maps CLI option spelling to request field
+ * spelling, coerces numeric fields, and resolves image inputs. Providers
+ * decide whether a value is supported.
  */
 export function buildGenerateRequest(
   prompt: string,
@@ -66,153 +49,45 @@ export function buildGenerateRequest(
   return {
     prompt,
     model: parseModelRef(modelRef),
-    size: parseSize(options.size),
-    n: parseOptionalPositiveInt(options.n, "--n"),
+    size: options.size,
+    n: toNumber(options.n),
     quality: options.quality,
-    output_format: parseOutputFormat(options.output_format),
-    background: parseBackground(options.background),
-    output_compression: parseOptionalBoundedInt(
-      options.output_compression,
-      "--output-compression",
-      0,
-      100
-    ),
-    moderation: parseModeration(options.moderation),
-    response_format: parseResponseFormat(options.response_format),
+    output_format: options.output_format,
+    background: options.background,
+    output_compression: toNumber(options.output_compression),
+    moderation: options.moderation,
+    response_format: options.response_format,
     stream: Boolean(options.stream),
-    partial_images: parseOptionalBoundedInt(options.partial_images, "--partial-images", 0, 3),
-    style: parseStyle(options.style),
-    user: parseOptionalNonBlank(options.user, "--user"),
+    partial_images: toNumber(options.partial_images),
+    style: options.style,
+    user: options.user,
     extra: parseExtra(options.extra),
     outputDir: options.outputDir,
     json: Boolean(options.json),
     reference_images: parseReferenceImages(options.reference_image),
     mask: parseImageInput(options.mask, "--mask"),
-    input_fidelity: parseInputFidelity(options.input_fidelity)
+    input_fidelity: options.input_fidelity
   };
 }
 
-function parseSize(value: string | undefined): string | undefined {
-  if (!value) {
+/**
+ * 把 CLI 传入的数值字符串/数字转成 number，不做范围校验。
+ * 未提供时返回 undefined；无法解析时返回 NaN（交给 provider 判定）。
+ */
+function toNumber(value: string | number | undefined): number | undefined {
+  if (value === undefined || value === "") {
     return undefined;
   }
-  if (value === "auto") {
+  if (typeof value === "number") {
     return value;
   }
-
-  const match = value.match(/^(\d+)x(\d+)$/);
-  if (!match) {
-    throw new Error('--size must be "auto" or explicit dimensions like "1024x1024".');
-  }
-
-  const width = Number(match[1]);
-  const height = Number(match[2]);
-  if (width <= 0 || height <= 0) {
-    throw new Error("--size dimensions must be positive integers.");
-  }
-  return value;
+  return Number(value);
 }
 
-function parseOptionalPositiveInt(
-  value: string | number | undefined,
-  flagName: string
-): number | undefined {
-  if (value === undefined) {
-    return undefined;
-  }
-  const parsed = Number(value);
-  if (!Number.isInteger(parsed) || parsed <= 0) {
-    throw new Error(`${flagName} must be a positive integer.`);
-  }
-  return parsed;
-}
-
-function parseOptionalBoundedInt(
-  value: string | number | undefined,
-  flagName: string,
-  min: number,
-  max: number
-): number | undefined {
-  if (value === undefined) {
-    return undefined;
-  }
-  const parsed = Number(value);
-  if (!Number.isInteger(parsed) || parsed < min || parsed > max) {
-    throw new Error(`${flagName} must be an integer between ${min} and ${max}.`);
-  }
-  return parsed;
-}
-
-function parseOutputFormat(
-  value: string | undefined
-): GenerateRequest["output_format"] {
-  if (!value) {
-    return undefined;
-  }
-  if (value !== "png" && value !== "jpeg" && value !== "webp") {
-    throw new Error(`Unsupported --output-format "${value}".`);
-  }
-  return value;
-}
-
-function parseBackground(
-  value: string | undefined
-): GenerateRequest["background"] {
-  if (!value) {
-    return undefined;
-  }
-  if (value !== "auto" && value !== "opaque" && value !== "transparent") {
-    throw new Error(`Unsupported --background "${value}".`);
-  }
-  return value;
-}
-
-function parseModeration(value: string | undefined): GenerateRequest["moderation"] {
-  if (!value) {
-    return undefined;
-  }
-  if (value !== "auto" && value !== "low") {
-    throw new Error(`Unsupported --moderation "${value}".`);
-  }
-  return value;
-}
-
-function parseResponseFormat(
-  value: string | undefined
-): GenerateRequest["response_format"] {
-  if (!value) {
-    return undefined;
-  }
-  if (value !== "url" && value !== "b64_json") {
-    throw new Error(`Unsupported --response-format "${value}".`);
-  }
-  return value;
-}
-
-function parseStyle(value: string | undefined): GenerateRequest["style"] {
-  if (!value) {
-    return undefined;
-  }
-  if (value !== "vivid" && value !== "natural") {
-    throw new Error(`Unsupported --style "${value}".`);
-  }
-  return value;
-}
-
-function parseOptionalNonBlank(
-  value: string | undefined,
-  flagName: string
-): string | undefined {
-  if (value === undefined) {
-    return undefined;
-  }
-  const trimmed = value.trim();
-  if (!trimmed) {
-    throw new Error(`${flagName} must not be empty.`);
-  }
-  return trimmed;
-}
-
+/**
+ * 解析 --extra：必须是合法 JSON 且为对象，原样透传，不做字段占用校验。
+ * （显式 flag 永远在 provider body 中后于 extra 合并，因此不会真的被覆盖。）
+ */
 function parseExtra(value: string | undefined): Record<string, unknown> | undefined {
   if (value === undefined) {
     return undefined;
@@ -229,16 +104,7 @@ function parseExtra(value: string | undefined): Record<string, unknown> | undefi
     throw new Error("--extra must be a JSON object.");
   }
 
-  const extra = parsed as Record<string, unknown>;
-  for (const key of Object.keys(extra)) {
-    if (RESERVED_EXTRA_KEYS.has(key)) {
-      throw new Error(
-        `--extra must not override OpenAI-compatible field "${key}".`
-      );
-    }
-  }
-
-  return extra;
+  return parsed as Record<string, unknown>;
 }
 
 /**
@@ -276,18 +142,6 @@ function parseReferenceImages(
     }
   }
   return parsed.length > 0 ? parsed : undefined;
-}
-
-function parseInputFidelity(
-  value: string | undefined
-): ImageInputFidelity | undefined {
-  if (!value) {
-    return undefined;
-  }
-  if (value !== "low" && value !== "high") {
-    throw new Error(`Unsupported --input-fidelity "${value}".`);
-  }
-  return value;
 }
 
 function toErrorMessage(error: unknown): string {
