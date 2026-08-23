@@ -8,8 +8,10 @@ import type { ImageConfigPaths } from "../config/types.js";
 import { loadPluginManifests } from "../plugins/loader.js";
 import { PROVIDER_CATALOG } from "../providers/catalog.js";
 import {
+  formatAllProviderModelsText,
   formatConfiguredProvidersText,
   formatProviderModelsText,
+  listAllProviderModels,
   listConfiguredProviders,
   listProviderModels
 } from "../providers/model-list.js";
@@ -265,6 +267,11 @@ class ImageCliProgram extends BaseCliProgram {
       return;
     }
 
+    if (subcommand === "models") {
+      await this.runProviderModels(rest);
+      return;
+    }
+
     if (subcommand === "model") {
       throw new CliUsageError(
         "unknown command 'provider model'. Use 'image provider <provider-id> model list'.",
@@ -289,6 +296,24 @@ class ImageCliProgram extends BaseCliProgram {
       return;
     }
     this.output.writeOut(formatConfiguredProvidersText(providers));
+  }
+
+  private async runProviderModels(args: string[]): Promise<void> {
+    const parsed = CLI_PARSE.parseCliArgs(args, CLI_OPTIONS.modelList, CLI_HELP.providerModels);
+    if (CLI_PARSE.isHelpRequested(parsed)) {
+      this.writeHelp(CLI_HELP.providerModels, 0);
+      return;
+    }
+    CLI_PARSE.ensureNoPositionals(parsed, CLI_HELP.providerModels);
+
+    const results = await listAllProviderModels({
+      limit: parsePositiveIntegerOption(CLI_PARSE.stringValue(parsed.values.limit))
+    });
+    if (parsed.values.json) {
+      this.output.writeOut(`${JSON.stringify(results, null, 2)}\n`);
+      return;
+    }
+    this.output.writeOut(formatAllProviderModelsText(results));
   }
 
   private async runProviderTarget(providerId: string, args: string[]): Promise<void> {
@@ -406,6 +431,7 @@ export function buildProgram(): ImageCliProgram {
   ]);
   const providerCommand = new CliCommandNode("provider", CLI_HELP.provider, [
     new CliCommandNode("list", CLI_HELP.providerList),
+    new CliCommandNode("models", CLI_HELP.providerModels),
     new CliCommandNode("<provider-id>", CLI_HELP.providerTarget, [
       providerModelCommand
     ])

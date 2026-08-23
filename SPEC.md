@@ -15,6 +15,7 @@ v1 public commands:
 - `image config doctor`
 - `image config providers`
 - `image provider list`
+- `image provider models`
 - `image provider <provider-id> model list`
 
 ## Design Principles
@@ -85,6 +86,7 @@ Provider inspection:
 
 ```bash
 image provider list [--json]
+image provider models [--json] [--limit COUNT]
 image provider <provider-id> model list [--json] [--limit COUNT]
 ```
 
@@ -96,6 +98,7 @@ image provider <provider-id> model list [--json] [--limit COUNT]
 - Missing required arguments print a concise error plus the target command's help.
 - Help and guidance output is English.
 - Root help may list all public operations; subcommand help must not append root-only operation guides.
+- Command-group help describes every subcommand with its purpose and expected output so humans and agents can pick the right command without reading source code.
 - New public commands must update `SPEC.md`, README files, generated help, bundled skill docs, and CLI help tests.
 - Help text is maintained in `src/cli/help.ts`; command routing belongs in `src/cli/program.ts`.
 
@@ -294,7 +297,13 @@ Rules:
 
 `image provider list` lists providers currently configured in `~/.image/config.json`.
 
-`image provider <provider-id> model list` lists model ids for a configured provider.
+`image provider models` lists model ids for every configured provider in config
+order. Text output groups models under `provider-id:` headers, one
+`- provider_id/model_id` entry per line, with that provider's warnings printed
+below the header. `--limit` applies per provider.
+
+`image provider <provider-id> model list` lists model ids for a configured
+provider as `- provider_id/model_id` entries, preceded by any warnings.
 
 Rules:
 

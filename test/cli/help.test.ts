@@ -148,11 +148,16 @@ describe("CLI help", () => {
       .find((command) => command.name() === "<provider-id>")
       ?.commands.find((command) => command.name() === "model")
       ?.helpInformation();
+    const modelsHelp = providerCommand?.commands.find((command) => command.name() === "models")
+      ?.helpInformation();
 
     expect(providerHelp).toContain("list");
+    expect(providerHelp).toContain("models");
     expect(providerHelp).toContain("<provider-id>");
     expect(providerTargetHelp).toContain("model list");
     expect(modelHelp).toContain("list");
+    expect(modelsHelp).toContain("Usage: image provider models");
+    expect(modelsHelp).toContain("--limit <count>");
   });
 
   test("prints root guidance when no root command is provided", async () => {
@@ -163,6 +168,7 @@ describe("CLI help", () => {
     expect(result.combined).toContain("Operations:");
     expect(result.combined).toContain("image generate <prompt> [options]");
     expect(result.combined).toContain("image provider list [--json]");
+    expect(result.combined).toContain("image provider models [--json] [--limit <count>]");
     expect(result.combined).toContain("image provider <provider-id> model list");
     expect(result.combined).not.toContain("image <provider-id> model list");
   });
@@ -178,7 +184,7 @@ describe("CLI help", () => {
     const configResult = await runProgram(["config"]);
     expect(configResult.exitCode).toBe(1);
     expect(configResult.combined).toContain("Usage: image config");
-    expect(configResult.combined).toContain("providers  list provider ids and aliases");
+    expect(configResult.combined).toContain("providers  list all known provider ids and aliases");
     expect(configResult.combined).not.toContain("Operations:");
 
     const providerTargetResult = await runProgram(["provider", "openai"]);

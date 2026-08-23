@@ -42,7 +42,7 @@ image provider --help
 image config init
 image config doctor --json
 image provider list
-image provider openai model list
+image provider models
 image generate "A cinematic fox poster in snowfall" --model openai/gpt-image-1.5
 ```
 
@@ -153,13 +153,16 @@ Secrets must stay out of tracked files.
 ```bash
 image provider list
 image provider list --json
+image provider models
 image provider openai model list
 image provider openai model list --json --limit 20
 ```
 
 Model listing uses provider APIs where the built-in integration supports it. If
 API discovery is unavailable, output includes an English warning that built-in
-model ids may be incomplete or outdated.
+model ids may be incomplete or outdated. Model ids print as
+`- provider/model` list entries; `image provider models` groups them under
+`provider-id:` headers for every configured provider.
 
 ## Public Behavior Source
 

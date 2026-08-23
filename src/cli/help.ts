@@ -1,5 +1,9 @@
 /**
  * Help text for each public CLI command.
+ *
+ * Every command group documents its subcommands with enough detail that both
+ * humans and agents can pick the right command and predict its output without
+ * reading source code. Help output is English.
  */
 export const CLI_HELP = {
   root: `Usage: image [options] [command]
@@ -10,9 +14,10 @@ Options:
   -h, --help       display help for command
 
 Commands:
-  generate <prompt>  Generate images from a prompt.
-  config             Manage local config.
-  provider           Inspect providers.
+  generate <prompt>  Generate images from a prompt, optionally with reference
+                     images, and save output files plus manifest.json.
+  config             Manage the ~/.image config file and installed skill docs.
+  provider           Inspect configured providers and their model ids.
   help [command]     display help for command
 
 Operations:
@@ -23,11 +28,19 @@ Operations:
   image config doctor [--json]
   image config providers [--json]
   image provider list [--json]
+  image provider models [--json] [--limit <count>]
   image provider <provider-id> model list [--json] [--limit <count>]
 `,
   generate: `Usage: image generate <prompt>
 
 Generate images.
+
+The prompt is required positional text; quote multi-line prompts. --model
+takes provider/model (e.g. openai/gpt-image-1.5) and defaults to
+config.defaultModel when omitted. Adding --reference-image turns the request
+into an image-to-image edit request. Outputs are saved to --output-dir
+(default ./image-output/<timestamp>/) as image-1.png ... plus manifest.json;
+stdout prints the saved file paths, the manifest path, and any warnings.
 
 Options:
   --model <provider/model>           defaults to config.defaultModel when omitted
@@ -56,16 +69,30 @@ Options:
 Manage image CLI configuration.
 
 Commands:
-  init       create missing config and skill files
-  path       print the config and skill paths used by the CLI
-  show       print sanitized config
-  doctor     check config files, curl, and credentials
-  providers  list provider ids and aliases
+  init       create missing config and skill files under ~/.image and every
+             supported skill directory; existing files are kept unless --force
+             is passed
+  path       print the ~/.image config directory, config.json, the example and
+             readme files, and every installed skill location
+  show       print the sanitized active config: the default model plus one
+             line per configured provider with enablement, credential count,
+             and base URL; secrets are never printed
+  doctor     check config files, curl availability, and per-provider
+             credentials; prints ok/missing lines for quick diagnosis
+  providers  list all known provider ids and aliases, including installed
+             plugin providers; unlike 'image provider list' this works
+             without configuring the provider first
   help       display help for command
 `,
   configInit: `Usage: image config init [--force]
 
 Create missing config and skill files.
+
+Creates ~/.image/config.json (provider entries with placeholder credentials
+to fill in; interactive prompts choose the Volcengine endpoint and Bailian
+workspace), config.example.json, README.md, and the image-cli skill files in
+every supported skill directory. Existing files are skipped; --force
+overwrites all managed files.
 
 Options:
   --force     overwrite all managed ~/.image and skill files
@@ -74,10 +101,17 @@ Options:
   configPath: `Usage: image config path
 
 Print config and skill paths.
+
+Prints the ~/.image config directory, config.json, config.example.json,
+README.md, and each directory the image-cli skill is installed to.
 `,
   configShow: `Usage: image config show [--json]
 
 Print sanitized config.
+
+Default output is the default model plus one line per configured provider
+with enablement, credential count, and base URL. API keys and other secrets
+are redacted. --json prints the sanitized config as a JSON document.
 
 Options:
   --json      print JSON output
@@ -87,6 +121,10 @@ Options:
 
 Check config files, curl, and credentials.
 
+Prints ok/missing status for the config files and curl, the resolved default
+model, and one line per configured provider with its credential count.
+--json prints the full machine-readable report.
+
 Options:
   --json      print JSON output
   -h, --help  display help for command
@@ -94,6 +132,10 @@ Options:
   configProviders: `Usage: image config providers [--json]
 
 List provider ids and aliases.
+
+Lists every known provider definition with its aliases: built-in providers
+and providers installed as plugins under ~/.image/plugins. This command shows
+what can be configured; 'image provider list' shows what is configured.
 
 Options:
   --json      print JSON output
@@ -104,27 +146,56 @@ Options:
 Inspect configured providers and model ids.
 
 Commands:
-  list              list configured providers
-  <provider-id>     inspect one provider
+  list              list providers configured in ~/.image/config.json, one
+                    line each with aliases, disabled state, and the default
+                    model when set
+  models            list model ids for every configured provider, grouped by
+                    'provider-id:' headers with '- provider/model' entries
+  <provider-id>     inspect one provider; accepts provider ids and aliases
   <provider-id> model list
-                    list model ids
+                    list one provider's model ids as '- provider/model'
+                    entries, from the provider API when supported, otherwise
+                    a built-in fallback list with a warning
   help              display help for command
 `,
   providerList: `Usage: image provider list [--json]
 
 List configured providers.
 
+One line per provider from ~/.image/config.json: provider id, aliases,
+'disabled' when the provider is disabled, and the default model when this
+provider provides it. --json adds the base URL, credential count, and
+built-in/plugin flags.
+
 Options:
   --json      print JSON output
   -h, --help  display help for command
+`,
+  providerModels: `Usage: image provider models [--json] [--limit <count>]
+
+List model ids for all configured providers, grouped by provider.
+
+Each provider prints a 'provider-id:' header, its warnings, then
+'- provider/model' entries ready to pass to --model, in config order. Model
+ids come from provider APIs when the built-in integration supports discovery;
+otherwise a built-in fallback list is printed with an English warning.
+--limit caps the entries printed per provider.
+
+Options:
+  --json           print JSON output
+  --limit <count>  limit printed model ids per provider
+  -h, --help       display help for command
 `,
   providerTarget: `Usage: image provider <provider-id> [command]
 
 Inspect one provider.
 
+<provider-id> is a provider id or alias configured in ~/.image/config.json,
+for example openai, chatgpt-image, or a plugin provider like oracle.
+
 Commands:
   model list
-            list model ids
+            list model ids for this provider
   help      display help for command
 `,
   providerTargetModel: `Usage: image provider <provider-id> model [command]
@@ -138,6 +209,11 @@ Commands:
   providerTargetModelList: `Usage: image provider <provider-id> model list
 
 List model ids for a configured provider.
+
+Prints warnings first, then '- provider/model' entries ready to pass to
+--model. Model ids come from the provider API when the built-in integration
+supports discovery; otherwise a built-in fallback list is printed with an
+English warning.
 
 Options:
   --json           print JSON output

@@ -84,6 +84,16 @@ const FALLBACK_MODELS: Record<string, ProviderModelEntry[]> = {
   ],
   minimax: [
     { id: "image-01" }
+  ],
+  // Bundled plugin provider (plugins/oracle): ids the plugin maps onto the
+  // oracle CLI's browser-mode model and thinking-time flags.
+  oracle: [
+    { id: "gpt-5.6-sol" },
+    { id: "gpt-5.6-sol-medium" },
+    { id: "gpt-5.6-sol-pro" },
+    { id: "gpt-5.6-sol-extra-high" },
+    { id: "gpt-5.5-pro" },
+    { id: "gemini-3-pro" }
   ]
 };
 
@@ -185,8 +195,36 @@ export function formatConfiguredProvidersText(entries: ConfiguredProviderEntry[]
 export function formatProviderModelsText(result: ProviderModelListResult): string {
   return [
     ...result.warnings.map((warning) => `warning: ${warning}`),
-    ...result.models.map((model) => model.id)
+    ...result.models.map((model) => `- ${result.providerId}/${model.id}`)
   ].join("\n") + "\n";
+}
+
+/**
+ * listAllProviderModels 的导出入口：按配置顺序聚合每个已配置 provider 的模型列表。
+ */
+export async function listAllProviderModels(
+  options: ModelListOptions = {}
+): Promise<ProviderModelListResult[]> {
+  const providers = await listConfiguredProviders(options);
+  const results: ProviderModelListResult[] = [];
+  for (const provider of providers) {
+    results.push(await listProviderModels(provider.providerId, options));
+  }
+  return results;
+}
+
+/**
+ * formatAllProviderModelsText 的导出入口：每个 provider 一个分组头加 `- provider/model` 列表。
+ */
+export function formatAllProviderModelsText(results: ProviderModelListResult[]): string {
+  if (results.length === 0) {
+    return "No providers are configured in ~/.image/config.json.\n";
+  }
+  return results.map((result) => [
+    `${result.providerId}:`,
+    ...result.warnings.map((warning) => `warning: ${warning}`),
+    ...result.models.map((model) => `- ${result.providerId}/${model.id}`)
+  ].join("\n")).join("\n") + "\n";
 }
 
 async function fetchProviderModels(
@@ -324,7 +362,10 @@ function applyLimit(models: ProviderModelEntry[], limit: number | undefined): Pr
   return models.slice(0, limit);
 }
 
-function readDefaultProviderId(defaultModel: string): string | undefined {
+function readDefaultProviderId(defaultModel: string | undefined): string | undefined {
+  if (!defaultModel) {
+    return undefined;
+  }
   const slashIndex = defaultModel.indexOf("/");
   if (slashIndex <= 0) {
     return undefined;

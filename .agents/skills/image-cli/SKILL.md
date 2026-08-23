@@ -75,10 +75,13 @@ image generate "add a knitted hat" --model openai/gpt-image-1.5 --reference-imag
 
 ```bash
 image provider list
+image provider models
 image provider openai model list
 ```
 
 Model-list output prefers provider APIs when supported. Built-in model-list output includes an English warning when model ids may be incomplete or outdated.
+
+Plugin providers under `~/.image/plugins/` extend the provider set without CLI changes, e.g. `oracle` (ChatGPT image generation through the local `oracle` CLI in browser mode: `--model oracle/gpt-5.6-sol`, display spellings like `oracle/GPT-5.6 Sol Medium` map to thinking-time levels).
 
 ## Provider Aliases
 

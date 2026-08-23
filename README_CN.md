@@ -37,7 +37,7 @@ image provider --help
 image config init
 image config doctor --json
 image provider list
-image provider openai model list
+image provider models
 image generate "A cinematic fox poster in snowfall" --model openai/gpt-image-1.5
 ```
 
@@ -145,12 +145,14 @@ image config providers --json
 ```bash
 image provider list
 image provider list --json
+image provider models
 image provider openai model list
 image provider openai model list --json --limit 20
 ```
 
 如果内置集成支持 provider API，model list 会优先访问 API。否则会打印英文 warning，
-说明内置 model id 可能不完整或不是最新。
+说明内置 model id 可能不完整或不是最新。model id 以 `- provider/model` 列表项输出；
+`image provider models` 会按 `provider-id:` 分组列出所有已配置 provider 的模型。
 
 ## 公共行为来源
 
