@@ -11,6 +11,8 @@ import {
   formatAllProviderModelsText,
   formatConfiguredProvidersText,
   formatProviderModelsText,
+  formatProviderSummaryText,
+  getProviderSummary,
   listAllProviderModels,
   listConfiguredProviders,
   listProviderModels
@@ -28,8 +30,10 @@ import { CLI_HELP, CLI_OPTIONS } from "./help.js";
 class ImageCliProgram extends BaseCliProgram {
   protected async run(args: string[]): Promise<void> {
     if (args.length === 0) {
-      this.writeHelp(CLI_HELP.root, 1);
-      return;
+      throw new CliUsageError(
+        "missing command. Run 'image config doctor' to check setup, or 'image --help' for all commands.",
+        CLI_HELP.root
+      );
     }
 
     const [command, ...rest] = args;
@@ -120,8 +124,7 @@ class ImageCliProgram extends BaseCliProgram {
 
   private async runConfig(args: string[]): Promise<void> {
     if (args.length === 0) {
-      this.writeHelp(CLI_HELP.config, 1);
-      return;
+      throw new CliUsageError("missing command", CLI_HELP.config);
     }
 
     const [subcommand, ...rest] = args;
@@ -247,8 +250,7 @@ class ImageCliProgram extends BaseCliProgram {
 
   private async runProvider(args: string[]): Promise<void> {
     if (args.length === 0) {
-      this.writeHelp(CLI_HELP.provider, 1);
-      return;
+      throw new CliUsageError("missing command", CLI_HELP.provider);
     }
 
     const [subcommand, ...rest] = args;
@@ -317,16 +319,26 @@ class ImageCliProgram extends BaseCliProgram {
   }
 
   private async runProviderTarget(providerId: string, args: string[]): Promise<void> {
-    if (args.length === 0) {
-      this.writeHelp(CLI_HELP.providerTarget, 1);
+    // Bare `image provider <id>` (plus optional flags) prints the provider
+    // summary; real subcommands still route below.
+    if (args.length === 0 || args[0].startsWith("-")) {
+      const parsed = CLI_PARSE.parseCliArgs(args, CLI_OPTIONS.json, CLI_HELP.providerTarget);
+      if (CLI_PARSE.isHelpRequested(parsed)) {
+        this.writeHelp(CLI_HELP.providerTarget, 0);
+        return;
+      }
+      CLI_PARSE.ensureNoPositionals(parsed, CLI_HELP.providerTarget);
+
+      const summary = await getProviderSummary(providerId);
+      if (parsed.values.json) {
+        this.output.writeOut(`${JSON.stringify(summary, null, 2)}\n`);
+        return;
+      }
+      this.output.writeOut(formatProviderSummaryText(summary));
       return;
     }
 
     const [subcommand, ...rest] = args;
-    if (CLI_PARSE.isHelpToken(subcommand)) {
-      this.writeHelp(CLI_HELP.providerTarget, 0);
-      return;
-    }
 
     if (subcommand === "help") {
       this.runProviderTargetHelp(rest);
@@ -368,8 +380,10 @@ class ImageCliProgram extends BaseCliProgram {
 
   private async runProviderTargetModel(providerId: string, args: string[]): Promise<void> {
     if (args.length === 0) {
-      this.writeHelp(CLI_HELP.providerTargetModel, 1);
-      return;
+      throw new CliUsageError(
+        `missing command for 'provider ${providerId} model'. Use 'list'.`,
+        CLI_HELP.providerTargetModel
+      );
     }
 
     const [subcommand, ...rest] = args;

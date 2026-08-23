@@ -58,8 +58,8 @@ Options:
   --user <id>                        end-user identifier
   --reference-image <path|url>       reference image; repeat to pass multiple (image-to-image)
   --mask <path|url>                  edit mask (PNG, transparent areas are editable)
-  --input-fidelity <value>           fidelity to reference image (gpt-image)
-  --extra <json>                     provider-specific JSON options; explicit flags take precedence
+  --input-fidelity <low|high>        fidelity to reference image (gpt-image)
+  --extra <json>                     provider-specific JSON object, e.g. '{"seed":123}'; explicit flags take precedence
   --output-dir <path>                directory for saved outputs; default is ./image-output/<timestamp>/
   --json                             print JSON manifest
   -h, --help                         display help for command
@@ -102,7 +102,7 @@ Options:
 
 Print config and skill paths.
 
-Prints the ~/.image config directory, config.json, config.example.json,
+Prints the ~/.image config directory, config.json, config.example.jsonc,
 README.md, and each directory the image-cli skill is installed to.
 `,
   configShow: `Usage: image config show [--json]
@@ -111,7 +111,9 @@ Print sanitized config.
 
 Default output is the default model plus one line per configured provider
 with enablement, credential count, and base URL. API keys and other secrets
-are redacted. --json prints the sanitized config as a JSON document.
+are redacted. The default model is the defaultModel key in the config file
+(path via 'image config path'); edit that file to change it. --json prints
+the sanitized config as a JSON document.
 
 Options:
   --json      print JSON output
@@ -151,7 +153,9 @@ Commands:
                     model when set
   models            list model ids for every configured provider, grouped by
                     'provider-id:' headers with '- provider/model' entries
-  <provider-id>     inspect one provider; accepts provider ids and aliases
+  <provider-id>     print one provider's summary (type, aliases, enabled,
+                    credentials, baseUrl, default model); provider ids and
+                    aliases both work here
   <provider-id> model list
                     list one provider's model ids as '- provider/model'
                     entries, from the provider API when supported, otherwise
@@ -177,21 +181,31 @@ List model ids for all configured providers, grouped by provider.
 
 Each provider prints a 'provider-id:' header, its warnings, then
 '- provider/model' entries ready to pass to --model, in config order. Model
-ids come from provider APIs when the built-in integration supports discovery;
-otherwise a built-in fallback list is printed with an English warning.
---limit caps the entries printed per provider.
+ids come from provider APIs when the built-in integration supports discovery
+(known image model families listed first); otherwise a built-in fallback
+list is printed with an English warning. --limit caps the entries printed
+per provider; when it truncates, a '(showing N of M models)' line follows.
 
 Options:
   --json           print JSON output
   --limit <count>  limit printed model ids per provider
   -h, --help       display help for command
 `,
-  providerTarget: `Usage: image provider <provider-id> [command]
+  providerTarget: `Usage: image provider <provider-id> [options] [command]
 
-Inspect one provider.
+Print one provider's summary, or run its subcommands.
 
-<provider-id> is a provider id or alias configured in ~/.image/config.json,
-for example openai, chatgpt-image, or a plugin provider like oracle.
+Bare invocation prints key=value lines: provider id, type (built-in or
+plugin), description, aliases, configured/enabled state, credential count,
+base URL, and the default model when this provider provides it. Use
+'image config show' for all providers at once, and 'model list' below for
+model ids. <provider-id> accepts provider ids and aliases configured in
+~/.image/config.json, for example openai, chatgpt-image, or a plugin
+provider like oracle.
+
+Options:
+  --json      print JSON output
+  -h, --help  display help for command
 
 Commands:
   model list
@@ -212,8 +226,9 @@ List model ids for a configured provider.
 
 Prints warnings first, then '- provider/model' entries ready to pass to
 --model. Model ids come from the provider API when the built-in integration
-supports discovery; otherwise a built-in fallback list is printed with an
-English warning.
+supports discovery (known image model families listed first); otherwise a
+built-in fallback list is printed with an English warning. When --limit
+truncates, a '(showing N of M models)' line follows.
 
 Options:
   --json           print JSON output

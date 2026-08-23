@@ -5,11 +5,23 @@ import path from "node:path";
 import { describe, expect, test } from "vitest";
 
 import type { ResolvedProviderConfig } from "../../src/config/types.js";
-import { executeGenerateWithFailover } from "../../src/runtime/generate.js";
+import { decorateGenerateFailure, executeGenerateWithFailover } from "../../src/runtime/generate.js";
 import { writeGenerateArtifacts } from "../../src/runtime/output.js";
 import type { ProviderPlugin } from "../../src/providers/types.js";
 
 describe("runtime generate", () => {
+  test("appends a next-step hint to provider HTTP failures", () => {
+    const decorated = decorateGenerateFailure(
+      new Error("OpenAI request failed with HTTP 400: billing_hard_limit_reached: Billing hard limit has been reached.")
+    ) as Error;
+    expect(decorated.message).toContain("HTTP 400");
+    expect(decorated.message).toContain("Next: run 'image config doctor'");
+    expect(decorated.message).toContain("'image provider list'");
+
+    const untouched = decorateGenerateFailure(new Error("missing command")) as Error;
+    expect(untouched.message).toBe("missing command");
+  });
+
   test("rotates to the next credential on retryable credential failures", async () => {
     let attempts = 0;
     const plugin: ProviderPlugin = {

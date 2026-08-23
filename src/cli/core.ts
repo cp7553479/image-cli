@@ -131,7 +131,10 @@ export const CLI_PARSE = {
         positionals: parsed.positionals
       };
     } catch (error) {
-      throw new CliUsageError(toErrorMessage(error), helpText);
+      throw new CliUsageError(
+        suggestOptionCorrection(toErrorMessage(error), options),
+        helpText
+      );
     }
   },
 
@@ -170,4 +173,61 @@ export const CLI_PARSE = {
 
 function toErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * Rewrites unknown-option errors into a typo correction with the closest
+ * declared option, replacing node's unrelated "--"-positional advice so agents
+ * recover in one step.
+ */
+function suggestOptionCorrection(
+  message: string,
+  options: Record<string, unknown> | undefined
+): string {
+  const match = message.match(/Unknown option '(--[^']+)'/);
+  if (!match || !options) {
+    return message;
+  }
+
+  const provided = match[1];
+  const suggestion = findClosestOption(provided, Object.keys(options).map((name) => `--${name}`));
+  if (!suggestion) {
+    return message;
+  }
+  return `Unknown option '${provided}'. Did you mean '${suggestion}'?`;
+}
+
+function findClosestOption(provided: string, knownOptions: string[]): string | undefined {
+  const normalized = provided.replaceAll("_", "-");
+  const exact = knownOptions.find((option) => option === normalized);
+  if (exact) {
+    return exact;
+  }
+
+  let best: { option: string; distance: number } | undefined;
+  for (const option of knownOptions) {
+    const distance = editDistance(normalized, option);
+    if (!best || distance < best.distance) {
+      best = { option, distance };
+    }
+  }
+  return best && best.distance <= 2 ? best.option : undefined;
+}
+
+function editDistance(left: string, right: string): number {
+  const rows = left.length + 1;
+  const columns = right.length + 1;
+  let previous = Array.from({ length: columns }, (_, index) => index);
+  for (let row = 1; row < rows; row += 1) {
+    const current = [row];
+    for (let column = 1; column < columns; column += 1) {
+      current[column] = Math.min(
+        previous[column] + 1,
+        current[column - 1] + 1,
+        previous[column - 1] + (left[row - 1] === right[column - 1] ? 0 : 1)
+      );
+    }
+    previous = current;
+  }
+  return previous[right.length];
 }

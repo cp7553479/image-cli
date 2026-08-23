@@ -32,7 +32,7 @@ describe("CLI help", () => {
     expect(generateHelp).toContain("--extra <json>");
     expect(generateHelp).toContain("--reference-image <path|url>");
     expect(generateHelp).toContain("--mask <path|url>");
-    expect(generateHelp).toContain("--input-fidelity <value>");
+    expect(generateHelp).toContain("--input-fidelity <low|high>");
     expect(generateHelp).toContain("print JSON manifest");
     expect(generateHelp).toContain("Usage: image generate <prompt>");
     expect(generateHelp).toContain("config.defaultModel");
@@ -164,6 +164,7 @@ describe("CLI help", () => {
     const result = await runProgram([]);
 
     expect(result.exitCode).toBe(1);
+    expect(result.combined).toContain("error: missing command");
     expect(result.combined).toContain("Usage: image");
     expect(result.combined).toContain("Operations:");
     expect(result.combined).toContain("image generate <prompt> [options]");
@@ -171,6 +172,45 @@ describe("CLI help", () => {
     expect(result.combined).toContain("image provider models [--json] [--limit <count>]");
     expect(result.combined).toContain("image provider <provider-id> model list");
     expect(result.combined).not.toContain("image <provider-id> model list");
+  });
+
+  test("prints a missing-command error before local group help", async () => {
+    const providerResult = await runProgram(["provider"]);
+    expect(providerResult.exitCode).toBe(1);
+    expect(providerResult.combined).toContain("error: missing command");
+    expect(providerResult.combined).toContain("Usage: image provider");
+    expect(providerResult.combined).toContain("<provider-id> model list");
+    expect(providerResult.combined).not.toContain("Operations:");
+    expect(providerResult.combined).not.toContain("image generate <prompt> [options]");
+
+    const configResult = await runProgram(["config"]);
+    expect(configResult.exitCode).toBe(1);
+    expect(configResult.combined).toContain("error: missing command");
+    expect(configResult.combined).toContain("Usage: image config");
+    expect(configResult.combined).toContain("providers  list all known provider ids and aliases");
+    expect(configResult.combined).not.toContain("Operations:");
+
+    const modelGroupResult = await runProgram(["provider", "openai", "model"]);
+    expect(modelGroupResult.exitCode).toBe(1);
+    expect(modelGroupResult.combined).toContain("error: missing command for 'provider openai model'");
+    expect(modelGroupResult.combined).toContain("Usage: image provider <provider-id> model");
+    expect(modelGroupResult.combined).not.toContain("Operations:");
+  });
+
+  test("rejects unknown provider ids with a discovery hint", async () => {
+    await expect(runProgram(["provider", "definitely-not-a-provider"])).rejects.toThrow(
+      "Unknown provider \"definitely-not-a-provider\". Run 'image config providers' to see known provider ids and aliases."
+    );
+  });
+
+  test("suggests the closest flag for unknown options", async () => {
+    const underscore = await runProgram(["generate", "test", "--reference_image", "foo.png"]);
+    expect(underscore.exitCode).toBe(1);
+    expect(underscore.combined).toContain("Did you mean '--reference-image'?");
+
+    const abbreviated = await runProgram(["provider", "list", "--jso"]);
+    expect(abbreviated.exitCode).toBe(1);
+    expect(abbreviated.combined).toContain("Did you mean '--json'?");
   });
 
   test("prints local command-group guidance without leaking root guidance", async () => {
@@ -186,12 +226,6 @@ describe("CLI help", () => {
     expect(configResult.combined).toContain("Usage: image config");
     expect(configResult.combined).toContain("providers  list all known provider ids and aliases");
     expect(configResult.combined).not.toContain("Operations:");
-
-    const providerTargetResult = await runProgram(["provider", "openai"]);
-    expect(providerTargetResult.exitCode).toBe(1);
-    expect(providerTargetResult.combined).toContain("Usage: image provider <provider-id>");
-    expect(providerTargetResult.combined).toContain("model list");
-    expect(providerTargetResult.combined).not.toContain("Operations:");
 
     const providerTargetModelResult = await runProgram(["provider", "openai", "model"]);
     expect(providerTargetModelResult.exitCode).toBe(1);

@@ -87,13 +87,14 @@ Provider inspection:
 ```bash
 image provider list [--json]
 image provider models [--json] [--limit COUNT]
+image provider <provider-id> [--json]
 image provider <provider-id> model list [--json] [--limit COUNT]
 ```
 
 ## Help Standard
 
-- Running `image` without a subcommand prints concise root help plus the public operation guide, then exits non-zero.
-- Running a command group without a required subcommand prints only that group's local help and exits non-zero.
+- Running `image` without a subcommand prints a concise missing-command error followed by the root help and public operation guide, then exits non-zero.
+- Running a command group without a required subcommand prints a concise missing-command error followed by that group's local help, then exits non-zero.
 - `-h` and `--help` print command help and exit zero.
 - Missing required arguments print a concise error plus the target command's help.
 - Help and guidance output is English.
@@ -302,8 +303,19 @@ order. Text output groups models under `provider-id:` headers, one
 `- provider_id/model_id` entry per line, with that provider's warnings printed
 below the header. `--limit` applies per provider.
 
+`image provider <provider-id>` prints one provider's summary as key=value
+lines (provider id, type, description, aliases, configured/enabled,
+credentials, base URL, default model when applicable), exit zero. Unknown
+ids fail with the `Unknown provider` error and a discovery hint.
+
 `image provider <provider-id> model list` lists model ids for a configured
 provider as `- provider_id/model_id` entries, preceded by any warnings.
+`<provider-id>` accepts provider aliases (e.g. `chatgpt-image`) the same way
+`--model` routing does. JSON output model entries include `modelRef`
+(`provider_id/model_id`) usable directly as `--model`. API-sourced lists
+order known image model families (image, dall-e, imagen, banana, seedream)
+first without filtering; when `--limit` truncates a list, a
+`(showing N of M models)` line follows and JSON carries `total`.
 
 Rules:
 
@@ -330,5 +342,6 @@ Required behavior:
 
 - validation errors are concise and flag-specific
 - provider request failures include provider name and safe status details
+- failed generate runs print a next-step hint pointing at `image config doctor` and `image provider list` so callers can self-recover
 - retryable credential failures rotate credentials
 - raw provider responses stay in `manifest.json`, not default stdout

@@ -33,6 +33,8 @@ export type ConfiguredProviderEntry = {
 export type ProviderModelEntry = {
   id: string;
   name?: string;
+  /** `provider_id/model_id` reference usable directly as --model. */
+  modelRef?: string;
 };
 
 export type ProviderModelListResult = {
@@ -40,13 +42,32 @@ export type ProviderModelListResult = {
   source: "api" | "fallback";
   models: ProviderModelEntry[];
   warnings: string[];
+  /** Full model count before --limit truncation; present only when truncated. */
+  total?: number;
+};
+
+/** One provider's identity and configuration summary for `image provider <id>`. */
+export type ProviderSummary = {
+  providerId: string;
+  aliases: string[];
+  type: "built-in" | "plugin";
+  description?: string;
+  configured: boolean;
+  enabled?: boolean;
+  credentialCount?: number;
+  apiBaseUrl?: string;
+  defaultModel?: string;
 };
 
 const FALLBACK_MODEL_WARNING =
   "Built-in model ids may be incomplete or outdated. Confirm the actual model ids with the provider before use.";
 
 const API_MODEL_SCOPE_WARNING =
-  "API model lists may include models that are not valid for image generation. Confirm image-generation support before use.";
+  "API model lists may include models that are not valid for image generation. Known image model families (image, dall-e, imagen, banana, seedream) are listed first; confirm support with the provider before use.";
+
+// Shared id pattern for well-known image model families; used only to order
+// API-sourced lists, never to filter or to claim per-model capability.
+const IMAGE_MODEL_ID_PATTERN = /image|dall-e|imagen|banana|seedream/i;
 
 // See docs/error-handling.md#model-listing for fallback warning requirements.
 const NO_MODEL_CATALOG_WARNING =
@@ -140,37 +161,158 @@ export async function listProviderModels(
 ): Promise<ProviderModelListResult> {
   const homeDir = options.homeDir ?? os.homedir();
   const resolvedConfig = await loadResolvedConfig({ homeDir });
-  const providerConfig = resolvedConfig.providers[providerId];
+  // Help output advertises aliases (e.g. chatgpt-image, oracle-image), so the
+  // listing surface must resolve them exactly like --model routing does.
+  const canonicalProviderId = resolveListingProviderId(providerId, homeDir);
+  const providerConfig = resolvedConfig.providers[canonicalProviderId];
   if (!providerConfig) {
-    throw new Error(`Provider "${providerId}" is not configured in ~/.image/config.json.`);
+    throw new Error(
+      `Provider "${canonicalProviderId}" is not configured in ~/.image/config.json. Run 'image provider list' to see configured providers.`
+    );
   }
 
-  if (API_MODEL_PROVIDERS.has(providerId) && canUseModelListApi(providerId, providerConfig)) {
-    const apiResult = await fetchProviderModels(providerId, providerConfig, {
+  if (API_MODEL_PROVIDERS.has(canonicalProviderId) && canUseModelListApi(canonicalProviderId, providerConfig)) {
+    const apiResult = await fetchProviderModels(canonicalProviderId, providerConfig, {
       execute: options.execute ?? executeCurlRequest
     }).catch((error: unknown) => ({
       error: toErrorMessage(error)
     }));
 
     if ("models" in apiResult) {
+      const all = withModelRefs(canonicalProviderId, orderKnownImageModelsFirst(apiResult.models));
+      const limited = limitModels(all, options.limit);
       return {
-        providerId,
+        providerId: canonicalProviderId,
         source: "api",
-        models: applyLimit(apiResult.models, options.limit),
-        warnings: [API_MODEL_SCOPE_WARNING]
+        models: limited.models,
+        warnings: [API_MODEL_SCOPE_WARNING],
+        ...limited.total !== undefined ? { total: limited.total } : {}
       };
     }
 
-    return fallbackModelList(providerId, [
+    return fallbackModelList(canonicalProviderId, [
       `Could not fetch models from provider API: ${apiResult.error}`,
       FALLBACK_MODEL_WARNING
     ], options.limit);
   }
 
-  const warnings = API_MODEL_PROVIDERS.has(providerId)
+  const warnings = API_MODEL_PROVIDERS.has(canonicalProviderId)
     ? ["No configured API key was found for API model listing.", FALLBACK_MODEL_WARNING]
     : [FALLBACK_MODEL_WARNING];
-  return fallbackModelList(providerId, warnings, options.limit);
+  return fallbackModelList(canonicalProviderId, warnings, options.limit);
+}
+
+/**
+ * Resolves a provider id or alias (built-in catalog plus installed plugins)
+ * for the listing surface; unknown-but-plausible ids pass through unchanged so
+ * the caller reports them as unconfigured.
+ */
+function resolveListingProviderId(providerId: string, homeDir: string): string {
+  const identities = [
+    ...PROVIDER_CATALOG,
+    ...loadPluginManifests(homeDir).map((manifest) => ({
+      providerId: manifest.providerId,
+      aliases: manifest.aliases ?? []
+    }))
+  ];
+  try {
+    return resolveProviderAlias(providerId, identities);
+  } catch {
+    return providerId;
+  }
+}
+
+/** Attaches `modelRef` (`provider_id/model_id`) so JSON entries are --model ready. */
+function withModelRefs(providerId: string, models: ProviderModelEntry[]): ProviderModelEntry[] {
+  return models.map((model) => ({ ...model, modelRef: `${providerId}/${model.id}` }));
+}
+
+/** Stable-orders models matching known image families ahead of everything else. */
+function orderKnownImageModelsFirst(models: ProviderModelEntry[]): ProviderModelEntry[] {
+  const imageModels = models.filter((model) => IMAGE_MODEL_ID_PATTERN.test(model.id));
+  const otherModels = models.filter((model) => !IMAGE_MODEL_ID_PATTERN.test(model.id));
+  return [...imageModels, ...otherModels];
+}
+
+/** Applies --limit and records the pre-truncation total for display. */
+function limitModels(
+  models: ProviderModelEntry[],
+  limit: number | undefined
+): { models: ProviderModelEntry[]; total?: number } {
+  const limited = applyLimit(models, limit);
+  if (limit !== undefined && limit > 0 && limited.length < models.length) {
+    return { models: limited, total: models.length };
+  }
+  return { models: limited };
+}
+
+/**
+ * getProviderSummary 的导出入口：聚合 catalog、插件 manifest 与 config 的单 provider 摘要。
+ */
+export async function getProviderSummary(
+  providerId: string,
+  options: ProviderListOptions = {}
+): Promise<ProviderSummary> {
+  const homeDir = options.homeDir ?? os.homedir();
+  const canonicalProviderId = resolveListingProviderId(providerId, homeDir);
+  const builtIn = PROVIDER_CATALOG.find((entry) => entry.providerId === canonicalProviderId);
+  const plugin = loadPluginManifests(homeDir).find((manifest) => manifest.providerId === canonicalProviderId);
+  if (!builtIn && !plugin) {
+    throw new Error(
+      `Unknown provider "${providerId}". Run 'image config providers' to see known provider ids and aliases.`
+    );
+  }
+
+  const resolvedConfig = await loadResolvedConfig({ homeDir });
+  const providerConfig = resolvedConfig.providers[canonicalProviderId];
+  return {
+    providerId: canonicalProviderId,
+    type: builtIn ? "built-in" : "plugin",
+    description: builtIn?.description ?? plugin?.description,
+    aliases: builtIn ? [...builtIn.aliases] : [...(plugin?.aliases ?? [])],
+    configured: Boolean(providerConfig),
+    enabled: providerConfig ? providerConfig.enabled !== false : undefined,
+    credentialCount: providerConfig?.credentials.length,
+    apiBaseUrl: providerConfig?.apiBaseUrl,
+    defaultModel: isDefaultProvider(canonicalProviderId, resolvedConfig.defaultModel)
+      ? resolvedConfig.defaultModel
+      : undefined
+  };
+}
+
+function isDefaultProvider(providerId: string, defaultModel: string | undefined): boolean {
+  if (typeof defaultModel !== "string") {
+    return false;
+  }
+  const slashIndex = defaultModel.indexOf("/");
+  if (slashIndex <= 0) {
+    return false;
+  }
+  try {
+    return resolveProviderAlias(defaultModel.slice(0, slashIndex)) === providerId;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * formatProviderSummaryText 的导出入口：key=value 单行一项，供人类与 agent 阅读的 provider 摘要。
+ */
+export function formatProviderSummaryText(summary: ProviderSummary): string {
+  return [
+    `provider=${summary.providerId}`,
+    `type=${summary.type}`,
+    summary.description ? `description=${summary.description}` : undefined,
+    summary.aliases.length > 0 ? `aliases=${summary.aliases.join(",")}` : undefined,
+    `configured=${summary.configured}`,
+    ...(summary.configured ? [
+      `enabled=${summary.enabled !== false}`,
+      `credentials=${summary.credentialCount ?? 0}`,
+      summary.apiBaseUrl ? `baseUrl=${summary.apiBaseUrl}` : undefined
+    ] : []),
+    summary.defaultModel ? `defaultModel=${summary.defaultModel}` : undefined,
+    `models=image provider ${summary.providerId} model list`
+  ].filter(Boolean).join("\n") + "\n";
 }
 
 /**
@@ -195,8 +337,16 @@ export function formatConfiguredProvidersText(entries: ConfiguredProviderEntry[]
 export function formatProviderModelsText(result: ProviderModelListResult): string {
   return [
     ...result.warnings.map((warning) => `warning: ${warning}`),
-    ...result.models.map((model) => `- ${result.providerId}/${model.id}`)
+    ...result.models.map((model) => `- ${result.providerId}/${model.id}`),
+    ...truncationLine(result)
   ].join("\n") + "\n";
+}
+
+function truncationLine(result: ProviderModelListResult): string[] {
+  if (result.total === undefined) {
+    return [];
+  }
+  return [`(showing ${result.models.length} of ${result.total} models)`];
 }
 
 /**
@@ -223,7 +373,8 @@ export function formatAllProviderModelsText(results: ProviderModelListResult[]):
   return results.map((result) => [
     `${result.providerId}:`,
     ...result.warnings.map((warning) => `warning: ${warning}`),
-    ...result.models.map((model) => `- ${result.providerId}/${model.id}`)
+    ...result.models.map((model) => `- ${result.providerId}/${model.id}`),
+    ...truncationLine(result)
   ].join("\n")).join("\n") + "\n";
 }
 
@@ -337,11 +488,13 @@ function fallbackModelList(
   const finalWarnings = models.length > 0
     ? warnings
     : [...warnings, NO_MODEL_CATALOG_WARNING];
+  const limited = limitModels(models.map((model) => ({ ...model })), limit);
   return {
     providerId,
     source: "fallback",
-    models: applyLimit(models, limit),
-    warnings: finalWarnings
+    models: withModelRefs(providerId, limited.models),
+    warnings: finalWarnings,
+    ...limited.total !== undefined ? { total: limited.total } : {}
   };
 }
 

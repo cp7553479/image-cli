@@ -9,6 +9,8 @@ import {
   formatAllProviderModelsText,
   formatConfiguredProvidersText,
   formatProviderModelsText,
+  formatProviderSummaryText,
+  getProviderSummary,
   listAllProviderModels,
   listConfiguredProviders,
   listProviderModels
@@ -109,7 +111,7 @@ describe("provider and model listing", () => {
       ]
     });
     expect(formatProviderModelsText(result)).toBe([
-      "warning: API model lists may include models that are not valid for image generation. Confirm image-generation support before use.",
+      "warning: API model lists may include models that are not valid for image generation. Known image model families (image, dall-e, imagen, banana, seedream) are listed first; confirm support with the provider before use.",
       "- openai/gpt-image-2",
       "- openai/gpt-image-1.5",
       ""
@@ -246,9 +248,10 @@ describe("provider and model listing", () => {
       providerId: "bailian",
       source: "fallback",
       models: [
-        { id: "qwen-image-2.0-pro" },
-        { id: "qwen-image-2.0-pro-2026-03-03" }
+        { id: "qwen-image-2.0-pro", modelRef: "bailian/qwen-image-2.0-pro" },
+        { id: "qwen-image-2.0-pro-2026-03-03", modelRef: "bailian/qwen-image-2.0-pro-2026-03-03" }
       ],
+      total: 9,
       warnings: [
         "Built-in model ids may be incomplete or outdated. Confirm the actual model ids with the provider before use."
       ]
@@ -267,8 +270,36 @@ describe("provider and model listing", () => {
     });
 
     await expect(listProviderModels("missing", { homeDir })).rejects.toThrow(
-      /Provider "missing" is not configured/
+      "Provider \"missing\" is not configured in ~/.image/config.json. Run 'image provider list' to see configured providers."
     );
+  });
+
+  test("resolves provider aliases like --model routing does", async () => {
+    const homeDir = await makeTempHome("image-cli-alias-models");
+    await writeConfig(homeDir, {
+      version: 1,
+      defaultModel: "openai/gpt-image-1.5",
+      providers: {
+        openai: makeProvider("https://api.openai.com/v1", "openai-key")
+      }
+    });
+    const requests: CurlRequest[] = [];
+
+    const result = await listProviderModels("chatgpt-image", {
+      homeDir,
+      execute: async (request) => {
+        requests.push(request);
+        return makeCurlResult({ data: [{ id: "gpt-image-2" }] });
+      }
+    });
+
+    expect(requests[0]?.url).toBe("https://api.openai.com/v1/models");
+    expect(result.providerId).toBe("openai");
+    expect(result.models[0]).toEqual({
+      id: "gpt-image-2",
+      name: undefined,
+      modelRef: "openai/gpt-image-2"
+    });
   });
 
   test("warns when a configured plugin provider has no model catalog", async () => {
@@ -312,6 +343,99 @@ describe("provider and model listing", () => {
     expect(formatProviderModelsText(result)).toContain("- oracle/gpt-5.6-sol");
   });
 
+  test("prints a provider summary from catalog and config data", async () => {
+    const homeDir = await makeTempHome("image-cli-provider-summary");
+    await writeConfig(homeDir, {
+      version: 1,
+      defaultModel: "openai/gpt-image-1.5",
+      providers: {
+        openai: makeProvider("https://api.openai.com/v1", "openai-key")
+      }
+    });
+
+    const summary = await getProviderSummary("chatgpt-image", { homeDir });
+    expect(summary).toEqual({
+      providerId: "openai",
+      type: "built-in",
+      description: "OpenAI Images API",
+      aliases: ["chatgpt-image"],
+      configured: true,
+      enabled: true,
+      credentialCount: 1,
+      apiBaseUrl: "https://api.openai.com/v1",
+      defaultModel: "openai/gpt-image-1.5"
+    });
+    const text = formatProviderSummaryText(summary);
+    expect(text).toContain("provider=openai");
+    expect(text).toContain("type=built-in");
+    expect(text).toContain("aliases=chatgpt-image");
+    expect(text).toContain("defaultModel=openai/gpt-image-1.5");
+    expect(text).toContain("models=image provider openai model list");
+  });
+
+  test("summarizes plugin providers", async () => {
+    const homeDir = await makeTempHome("image-cli-plugin-summary");
+    const pluginDir = path.join(homeDir, ".image", "plugins", "mock-provider");
+    await mkdir(pluginDir, { recursive: true });
+    await writeFile(
+      path.join(pluginDir, "plugin.json"),
+      JSON.stringify({
+        providerId: "mock-provider",
+        entry: "./index.js",
+        aliases: ["mock-image"],
+        description: "Mock provider"
+      })
+    );
+    await writeConfig(homeDir, {
+      version: 1,
+      providers: {
+        "mock-provider": makeProvider("https://mock.example/v1", "mock-key")
+      }
+    });
+
+    const summary = await getProviderSummary("mock-image", { homeDir });
+    expect(summary.type).toBe("plugin");
+    expect(summary.aliases).toEqual(["mock-image"]);
+    expect(summary.credentialCount).toBe(1);
+  });
+
+  test("rejects provider summaries for unknown ids", async () => {
+    const homeDir = await makeTempHome("image-cli-provider-summary-unknown");
+    await writeConfig(homeDir, { version: 1, providers: {} });
+    await expect(getProviderSummary("not-a-provider", { homeDir })).rejects.toThrow(
+      "Unknown provider \"not-a-provider\". Run 'image config providers' to see known provider ids and aliases."
+    );
+  });
+
+  test("reports truncation totals and orders known image families first", async () => {
+    const homeDir = await makeTempHome("image-cli-model-truncation");
+    await writeConfig(homeDir, {
+      version: 1,
+      defaultModel: "openai/gpt-image-1.5",
+      providers: {
+        openai: makeProvider("https://api.openai.com/v1", "openai-key")
+      }
+    });
+
+    const result = await listProviderModels("openai", {
+      homeDir,
+      limit: 3,
+      execute: async () => makeCurlResult({
+        data: [
+          { id: "gpt-3.5-turbo" },
+          { id: "gpt-image-2" },
+          { id: "gpt-4o" },
+          { id: "dall-e-3" },
+          { id: "tts-1" }
+        ]
+      })
+    });
+
+    expect(result.models.map((model) => model.id)).toEqual(["gpt-image-2", "dall-e-3", "gpt-3.5-turbo"]);
+    expect(result.total).toBe(5);
+    expect(formatProviderModelsText(result)).toContain("(showing 3 of 5 models)");
+  });
+
   test("lists models for every configured provider grouped by provider", async () => {
     const homeDir = await makeTempHome("image-cli-all-provider-models");
     await writeConfig(homeDir, {
@@ -334,12 +458,13 @@ describe("provider and model listing", () => {
     expect(results.map((result) => result.providerId)).toEqual(["openai", "bailian"]);
     expect(formatAllProviderModelsText(results)).toBe([
       "openai:",
-      "warning: API model lists may include models that are not valid for image generation. Confirm image-generation support before use.",
+      "warning: API model lists may include models that are not valid for image generation. Known image model families (image, dall-e, imagen, banana, seedream) are listed first; confirm support with the provider before use.",
       "- openai/gpt-image-2",
       "bailian:",
       "warning: Built-in model ids may be incomplete or outdated. Confirm the actual model ids with the provider before use.",
       "- bailian/qwen-image-2.0-pro",
       "- bailian/qwen-image-2.0-pro-2026-03-03",
+      "(showing 2 of 9 models)",
       ""
     ].join("\n"));
   });

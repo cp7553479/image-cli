@@ -76,6 +76,7 @@ image generate "add a knitted hat" --model openai/gpt-image-1.5 --reference-imag
 ```bash
 image provider list
 image provider models
+image provider openai
 image provider openai model list
 ```
 

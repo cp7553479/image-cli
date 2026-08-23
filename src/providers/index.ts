@@ -31,7 +31,9 @@ export function getProviderPlugin(providerId: string, options?: { homeDir?: stri
     return plugin;
   }
 
-  throw new Error(`Unknown provider "${providerId}".`);
+  throw new Error(
+    `Unknown provider "${providerId}". Run 'image config providers' to see known provider ids and aliases.`
+  );
 }
 
 /**

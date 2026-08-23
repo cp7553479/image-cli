@@ -61,7 +61,7 @@ Cases:
 | --- | --- | --- |
 | Missing config | `Missing ~/.image/config.json. Run "image config init" first.` | Run `image config init` |
 | Invalid JSON | `Failed to parse config.json: ...` | Fix JSON syntax |
-| Provider missing | `Provider "<id>" is not configured in ~/.image/config.json.` | Add provider config or change `--model` |
+| Provider missing | `Provider "<id>" is not configured in ~/.image/config.json. Run 'image provider list' to see configured providers.` | Add provider config or change `--model` |
 | No API keys | `Provider "<id>" does not have any resolved API keys.` | Fill `api_key` |
 | Existing init file | Listed under skipped files | Use `--force` only when overwrite is intended |
 
@@ -117,7 +117,7 @@ Cases:
 | --- | --- |
 | Built-in provider id | Use built-in provider |
 | Plugin provider id | Load plugin manifest from `~/.image/plugins/<name>/plugin.json` |
-| Unknown provider | Throw `Unknown provider "<id>".` |
+| Unknown provider | Throw `Unknown provider "<id>". Run 'image config providers' to see known provider ids and aliases.` |
 | Plugin action exits non-zero | Throw stderr or exit-code message |
 | Plugin returns invalid JSON | JSON parse error bubbles as provider failure |
 
@@ -149,6 +149,7 @@ Common failures:
 | Async task has unknown status | Throw provider-specific task status error |
 | Async task exceeds poll limit | Throw provider-specific poll limit error |
 | Provider reports structured API error | Include safe status/message details without secrets |
+| Provider HTTP failure during `image generate` | Append next-step hint: `Next: run 'image config doctor' ... or pass --model with another configured provider (see 'image provider list').` |
 
 ## Credential Failover
 

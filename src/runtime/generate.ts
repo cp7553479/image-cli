@@ -110,6 +110,8 @@ export async function runGenerateRequest(
     providerConfig,
     request,
     execute: executeCurlRequest
+  }).catch((error: unknown) => {
+    throw decorateGenerateFailure(error);
   });
 
   const outputDir = request.outputDir ?? defaultOutputDir();
@@ -125,6 +127,19 @@ export async function runGenerateRequest(
 export async function resolveDefaultModel(homeDir?: string): Promise<string | undefined> {
   const resolvedConfig = await loadResolvedConfig({ homeDir });
   return resolvedConfig.defaultModel;
+}
+
+/**
+ * decorateGenerateFailure 的导出入口：provider HTTP 失败追加下一步指引，
+ * 让调用方能自行恢复（查配置或换 provider）。
+ */
+export function decorateGenerateFailure(error: unknown): unknown {
+  if (error instanceof Error && /HTTP \d{3}/.test(error.message)) {
+    return new Error(
+      `${error.message}\nNext: run 'image config doctor' to check credentials/quota, or pass --model with another configured provider (see 'image provider list').`
+    );
+  }
+  return error;
 }
 
 function defaultOutputDir(): string {
