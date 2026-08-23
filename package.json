@@ -14,6 +14,7 @@
     "README.md",
     "README_CN.md",
     "plugins/PLUGINS_README.md",
+    "plugins/oracle",
     "SPEC.md"
   ],
   "scripts": {

@@ -1,0 +1,16 @@
+{
+  "providerId": "oracle",
+  "entry": "./index.mjs",
+  "runtime": "node",
+  "description": "Image generation through the local oracle CLI in ChatGPT browser mode (GPT-5.6 Sol).",
+  "aliases": ["oracle-image"],
+  "capabilities": {
+    "generate": true,
+    "edit": true,
+    "asyncTasks": false,
+    "streaming": false,
+    "background": false,
+    "multipleOutputs": false,
+    "transparentOutput": false
+  }
+}

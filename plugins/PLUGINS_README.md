@@ -6,6 +6,10 @@ built in.
 A plugin keeps the public CLI stable while adding one provider adapter under
 `~/.image/plugins/`.
 
+A bundled example lives in [`plugins/oracle/`](./oracle/README.md): it routes
+generation through the local `oracle` CLI in ChatGPT browser mode
+(`--engine browser --browser-manual-login`), including reference-image edits.
+
 ## Structure
 
 ```text
